@@ -241,12 +241,12 @@ export default function StatisticsPage() {
             <CardContent>
               <div className="text-2xl font-bold">
                 {isLoading ? '...' : (
-                  processedStats?.bestDay.count > 0 ? `${processedStats.bestDay.day}일` : '-'
+                  processedStats?.bestDay?.count && processedStats.bestDay.count > 0 ? `${processedStats.bestDay.day}일` : '-'
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
                 {isLoading ? '' : (
-                  processedStats?.bestDay.count > 0 ? `${processedStats.bestDay.count}명 이용` : '데이터 없음'
+                  processedStats?.bestDay?.count && processedStats.bestDay.count > 0 ? `${processedStats.bestDay.count}명 이용` : '데이터 없음'
                 )}
               </p>
             </CardContent>
