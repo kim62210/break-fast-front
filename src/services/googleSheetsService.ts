@@ -1,0 +1,618 @@
+import { google, sheets_v4, drive_v3 } from "googleapis";
+
+/** 구글 스프레드 서비스 상수 */
+const GOOGLE_SHEET_CONSTANT = {
+  SERVICE_EMAIL: "spreadsheet@ship-da.iam.gserviceaccount.com",
+  SERVICE_SCOPE: [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+  ],
+};
+
+export interface CheckInData {
+  name: string;
+  date: string;
+  time: string;
+  timestamp: string;
+}
+
+export interface SheetUserData {
+  name: string;
+  row: number;
+}
+
+export class GoogleSpreadSheetService {
+  private static instance: GoogleSpreadSheetService;
+  private readonly sheetClient: sheets_v4.Sheets;
+  private readonly spreadsheetId: string;
+  private readonly sheetName: string;
+
+  constructor() {
+    // 환경 변수에서 PEM 키의 \\n을 실제 줄바꿈으로 변환
+    const privateKey = process.env.GOOGLE_SPREAD_API_PEM_KEY?.replace(
+      /\\n/g,
+      "\n"
+    );
+
+    if (!privateKey) {
+      throw new Error(
+        "GOOGLE_SPREAD_API_PEM_KEY 환경 변수가 설정되지 않았습니다."
+      );
+    }
+
+    if (!process.env.GOOGLE_SPREAD_SERVICE_EMAIL) {
+      throw new Error(
+        "GOOGLE_SPREAD_SERVICE_EMAIL 환경 변수가 설정되지 않았습니다."
+      );
+    }
+
+    if (!process.env.GOOGLE_SPREADSHEET_ID) {
+      throw new Error("GOOGLE_SPREADSHEET_ID 환경 변수가 설정되지 않았습니다.");
+    }
+
+    const auth = new google.auth.JWT({
+      email: process.env.GOOGLE_SPREAD_SERVICE_EMAIL,
+      key: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCwxgWTtNzUWD1q\nYvnTY5ydBx2OVU2x9FvV49stVIzgwfSqV9jjtZ3RamXMsikxDIO5Vvx/lSLLmWoY\nJsnwVHSFYxu+XmHZjf/trnSBDU2IebmKHzqPcfCLfCQl8A8j6gZXG3zU2S2m7U8f\nM4K4lg3vhc8Ie1QjTzRuQuypRfOXDHT1O6qePKdMxzNfhFX4A4Jdql1PYlkCAoVt\nfPYOTpY+nvNvSBhBKGHZVJWKlP8fc9KycoivpwzFW/vB43MeZgOn2Ty/xnAvmFvJ\nu1GxGqKFJUEgwbA71pRGfUGpy++aBWfZHnQcvjuWQTBD4DCSH+jUCh+n3t6RHtVx\nZVXoz3c3AgMBAAECggEAQNy4CSWQ7b1e851Ti7P+MEP/HU3Bj21ZERdlQbHHa2Tf\nkG1hYNQwDzoaFky8/olX//ah+XJQbSJionABItTqWFMwR967yqbm5GBh0UR/UXdQ\nlBS3WRD2sUegv+bgt03Ue7vTRwpVTO3AXXN6IJ62iE+x0qvmCHq0g0y9J7NKGP7U\nMN0IOgfJORzLMjGZkapA1sDAVatqOBKhOya8RilMVLXV6eSqCqSQi8ZVfAV3WW83\ne2yKuR/FMQ74oMLI/5+VsAhUl/By2v4dXqDohgRFj2qmZYr+zIPUWG4Wuk+EaB9Y\nvKVQkyFobA6bwhHyzGyp8usMSgI5RN9tq7RDVIHKeQKBgQD3xoAnbfbAgBPbUiF2\nSiuAbTKxXeRPYbBTCZlyQoKArKUNOlj81qGwpTM6Pso6bBDMi6lvouhLbv3v1qy3\nvZQ8du8yiyrdZslf2YSRsQ3Rh3EkOu4ttnAoBps6aPtOdKBFLjLN/4rWZiX2n5wU\nWjjP+T+WYP53Ksmw4xsN1008lQKBgQC2pCy9jFv3t4aeGha/fnNTH9BUP84+kA5O\nIrGwGCzDq/4mo14Z4T3qVgyVeL/4NM1QEbpUnd/UE2oBUYQF7TBiWOkNxNusjaD1\nWe89jBDoq6+Z3fGyn8YTt1XEmynVc+vWpVzi1/4TO0CP4E/Ez+5EtZARM7rdIX1C\n133UBVFlmwKBgEDODTTC4RfmJ8tkRtY+ffRAG1MioJVWkpyVVSn6VVG8VgsIqL+w\nj2e5PZXNWG1BWH93Q+Cr9h/MruQs/M2t6viJjvRkS9jOinrkVHUanuefiisUsrkI\nD3uYhr8XOCuD+2s8sxMH9FMxMlq30kXMdzGGGmiFg+i9KzV1oNzU5CGlAoGAdXLd\n0oaQHZxHVSQxvLL0NmAe+A6P8mtwx45H9ZWWM75GkVI9ESdnSWpMbVJZIKPT48mC\nqSdc6GQTpwVkgOsmUhgaxl/xY+UvvJc44btQpE7DfY7b/qIAHm2nGect37XL0xxD\nvxxmprdTrTHyGf4cmtKm8mjxoYIHqxQoNk+1KEECgYEA8JD4PffQ1JpYqxue3ojj\nWjdoYbtfLV7n8QttH8xCK5ZLlIC9xbn48ysnxwNmv0ODEaIf/Cg1CcM6uc4WacpR\nPVc7HupgJmQ7BkWpHBTgVoBHMnmSTuhtL7tLEZMs+HPNlXtsGgNN9GcC7hAaUwTg\npPOEAOM/1++M3gQ56m+vGZY=\n-----END PRIVATE KEY-----\n",
+      scopes: GOOGLE_SHEET_CONSTANT.SERVICE_SCOPE,
+    });
+
+    this.sheetClient = google.sheets({ version: "v4", auth });
+    this.spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
+    this.sheetName = this.getCurrentSheetName();
+  }
+
+  /**
+   * 싱글톤 인스턴스 반환
+   */
+  public static getInstance(): GoogleSpreadSheetService {
+    if (!GoogleSpreadSheetService.instance) {
+      GoogleSpreadSheetService.instance = new GoogleSpreadSheetService();
+    }
+    return GoogleSpreadSheetService.instance;
+  }
+
+  /**
+   * 현재 월에 맞는 시트명 생성 (YY.MM 형식)
+   */
+  private getCurrentSheetName(): string {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2); // 24, 25 등
+    const month = (now.getMonth() + 1).toString().padStart(2, "0"); // 01, 02 등
+    return `${year}.${month}`;
+  }
+
+  /**
+   * 특정 날짜에 맞는 시트명 생성 (YY.MM 형식)
+   */
+  private getSheetNameByDate(date: Date): string {
+    const year = date.getFullYear().toString().slice(-2);
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    return `${year}.${month}`;
+  }
+
+  /**
+   * E열에서 사용자 목록과 행 번호 가져오기 (3글자 이름만 필터링)
+   */
+  private async getUserList(sheetName: string): Promise<SheetUserData[]> {
+    try {
+      const response = await this.sheetClient.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: `${sheetName}!E:E`,
+      });
+
+      const rows = response.data.values;
+      if (!rows || rows.length <= 2) {
+        return [];
+      }
+
+      // 3행부터 데이터 (2행은 헤더)
+      const userList: SheetUserData[] = [];
+      for (let i = 2; i < rows.length; i++) {
+        const name = rows[i] && rows[i][0];
+        if (name && name.trim()) {
+          const trimmedName = name.trim();
+          // 3글자 이름만 필터링
+          if (trimmedName.length === 3) {
+            userList.push({
+              name: trimmedName,
+              row: i + 1, // 스프레드시트 행 번호 (1부터 시작)
+            });
+          }
+        }
+      }
+
+      return userList;
+    } catch (error) {
+      console.error("사용자 목록 조회 오류:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 날짜에 해당하는 열 번호 계산 (F열=6부터 시작)
+   */
+  private getColumnByDate(date: number): string {
+    // F열이 1일, G열이 2일, ... AJ열이 31일
+    const columnIndex = 5 + date; // F열이 6번째 열(인덱스 5)
+    return this.numberToColumnLetter(columnIndex);
+  }
+
+  /**
+   * 숫자를 열 문자로 변환 (6 -> F, 7 -> G, ...)
+   */
+  private numberToColumnLetter(num: number): string {
+    let result = "";
+    while (num > 0) {
+      num--;
+      result = String.fromCharCode(65 + (num % 26)) + result;
+      num = Math.floor(num / 26);
+    }
+    return result;
+  }
+
+  /**
+   * 스프레드시트에 체크인 데이터 추가 (체크박스 방식, 3글자 이름만 허용)
+   */
+  public async addCheckIn(checkInData: CheckInData): Promise<boolean> {
+    try {
+      // 3글자 이름 검증
+      if (!checkInData.name || checkInData.name.trim().length !== 3) {
+        throw new Error("이름은 반드시 3글자여야 합니다.");
+      }
+
+      const trimmedName = checkInData.name.trim();
+      const checkInDate = new Date(checkInData.timestamp);
+      const sheetName = this.getSheetNameByDate(checkInDate);
+      const day = checkInDate.getDate();
+
+      // 중복 체크
+      const isDuplicate = await this.isDuplicateCheckIn(
+        trimmedName,
+        checkInDate
+      );
+      if (isDuplicate) {
+        throw new Error(
+          `${trimmedName}님은 ${checkInData.date}에 이미 체크인하셨습니다.`
+        );
+      }
+
+      // 사용자 목록에서 해당 이름의 행 찾기
+      const userList = await this.getUserList(sheetName);
+      const user = userList.find((u) => u.name === trimmedName);
+
+      if (!user) {
+        throw new Error(
+          `${trimmedName}님은 등록되지 않은 사용자입니다. 관리자에게 문의하세요.`
+        );
+      }
+
+      // 해당 날짜 열 계산
+      const column = this.getColumnByDate(day);
+      const cellRange = `${sheetName}!${column}${user.row}`;
+
+      // 체크박스에 TRUE 값 설정
+      const response = await this.sheetClient.spreadsheets.values.update({
+        spreadsheetId: this.spreadsheetId,
+        range: cellRange,
+        valueInputOption: "RAW",
+        requestBody: {
+          values: [[true]],
+        },
+      });
+
+      return response.status === 200;
+    } catch (error) {
+      console.error("Google Sheets 데이터 추가 오류:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 특정 날짜 컬럼에서 체크인된 사용자 수 조회
+   */
+  public async getCheckInCountByDate(targetDay: number): Promise<number> {
+    try {
+      const today = new Date();
+      const sheetName = this.getSheetNameByDate(today);
+      const targetColumn = this.getColumnByDate(targetDay);
+
+      // 사용자 목록 가져오기
+      const userList = await this.getUserList(sheetName);
+      if (userList.length === 0) {
+        return 0;
+      }
+
+      // 해당 날짜 컬럼의 모든 체크박스 상태 조회
+      const range = `${sheetName}!${targetColumn}3:${targetColumn}${
+        userList.length + 2
+      }`;
+
+      const response = await this.sheetClient.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: range,
+      });
+
+      const checkInStates = response.data.values || [];
+
+      // 체크된 셀의 개수 계산
+      let count = 0;
+      for (let i = 0; i < checkInStates.length; i++) {
+        const cellValue = checkInStates[i] && checkInStates[i][0];
+        if (cellValue === true || cellValue === "TRUE") {
+          count++;
+        }
+      }
+
+      return count;
+    } catch (error) {
+      console.error("체크인 수 조회 오류:", error);
+      return 0;
+    }
+  }
+
+  /**
+   * 오늘 날짜 컬럼에서 체크인된 사용자 수 조회
+   */
+  public async getTodayCheckInCount(): Promise<number> {
+    const today = new Date();
+    return this.getCheckInCountByDate(today.getDate());
+  }
+
+  /**
+   * 특정 날짜의 체크인 데이터 조회
+   */
+  public async getCheckInsByDate(date: string): Promise<CheckInData[]> {
+    try {
+      // 한국 날짜 형식을 Date 객체로 변환 (예: "2024. 1. 15.")
+      let targetDate: Date;
+      let targetDay: number;
+
+      if (date.includes(". ")) {
+        // "2024. 1. 15." 형식
+        const dateParts = date.replace(/\.$/, "").split(". ");
+        const year = parseInt(dateParts[0]);
+        const month = parseInt(dateParts[1]) - 1; // JavaScript 월은 0부터 시작
+        const day = parseInt(dateParts[2]);
+        targetDate = new Date(year, month, day);
+        targetDay = day;
+      } else {
+        // 현재 날짜 사용
+        targetDate = new Date();
+        targetDay = targetDate.getDate();
+      }
+
+      const sheetName = this.getSheetNameByDate(targetDate);
+
+      // 사용자 목록 가져오기
+      const userList = await this.getUserList(sheetName);
+      if (userList.length === 0) {
+        return [];
+      }
+
+      // 해당 날짜 열 계산
+      const column = this.getColumnByDate(targetDay);
+      const range = `${sheetName}!${column}3:${column}${userList.length + 2}`;
+
+      // 체크인 상태 조회
+      const response = await this.sheetClient.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: range,
+      });
+
+      const checkInStates = response.data.values || [];
+      const checkIns: CheckInData[] = [];
+
+      // 체크인된 사용자들만 반환
+      for (let i = 0; i < userList.length; i++) {
+        const cellValue = checkInStates[i] && checkInStates[i][0];
+        const isCheckedIn = cellValue === true || cellValue === "TRUE";
+
+        if (isCheckedIn) {
+          checkIns.push({
+            name: userList[i].name,
+            date: date,
+            time: "조식 시간", // 정확한 시간은 따로 기록되지 않음
+            timestamp: targetDate.toISOString(),
+          });
+        }
+      }
+
+      return checkIns;
+    } catch (error) {
+      console.error("Google Sheets 데이터 조회 오류:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 모든 체크인 데이터 조회
+   */
+  public async getAllCheckIns(): Promise<CheckInData[]> {
+    try {
+      const response = await this.sheetClient.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.sheetName}!A:D`,
+      });
+
+      const rows = response.data.values;
+      if (!rows || rows.length <= 1) {
+        return [];
+      }
+
+      // 헤더 제외하고 데이터만 처리
+      const dataRows = rows.slice(1);
+
+      return dataRows.map((row) => ({
+        name: row[0] || "",
+        date: row[1] || "",
+        time: row[2] || "",
+        timestamp: row[3] || "",
+      }));
+    } catch (error) {
+      console.error("Google Sheets 전체 데이터 조회 오류:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 중복 체크인 확인
+   */
+  private async isDuplicateCheckIn(name: string, date: Date): Promise<boolean> {
+    try {
+      const sheetName = this.getSheetNameByDate(date);
+      const day = date.getDate();
+
+      // 사용자 목록에서 해당 이름의 행 찾기
+      const userList = await this.getUserList(sheetName);
+      const user = userList.find((u) => u.name === name);
+
+      if (!user) {
+        return false; // 등록되지 않은 사용자
+      }
+
+      // 해당 날짜 열의 체크 상태 확인
+      const column = this.getColumnByDate(day);
+      const cellRange = `${sheetName}!${column}${user.row}`;
+
+      const response = await this.sheetClient.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: cellRange,
+      });
+
+      const cellValue = response.data.values?.[0]?.[0];
+      return cellValue === true || cellValue === "TRUE";
+    } catch (error) {
+      console.error("중복 체크 오류:", error);
+      return false;
+    }
+  }
+
+  /**
+   * 스프레드시트의 모든 시트 목록 조회
+   */
+  public async getAvailableSheets(): Promise<string[]> {
+    try {
+      const response = await this.sheetClient.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId,
+      });
+
+      const sheets = response.data.sheets || [];
+      const sheetNames = sheets
+        .map((sheet) => sheet.properties?.title || "")
+        .filter((name) => name);
+
+      return sheetNames;
+    } catch (error) {
+      console.error("시트 목록 조회 오류:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 등록된 사용자 목록 조회
+   */
+  public async getRegisteredUsers(): Promise<string[]> {
+    try {
+      const userList = await this.getUserList(this.sheetName);
+      return userList.map((user) => user.name);
+    } catch (error) {
+      console.error("등록된 사용자 목록 조회 오류:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 새 사용자 추가 (3글자 이름만 허용)
+   */
+  public async addUser(name: string): Promise<boolean> {
+    try {
+      // 3글자 이름 검증
+      if (!name || name.trim().length !== 3) {
+        throw new Error("이름은 반드시 3글자여야 합니다.");
+      }
+
+      const trimmedName = name.trim();
+      const userList = await this.getUserList(this.sheetName);
+
+      // 중복 확인
+      if (userList.some((user) => user.name === trimmedName)) {
+        throw new Error(`${trimmedName}님은 이미 등록된 사용자입니다.`);
+      }
+
+      // 새 행에 사용자 추가
+      const newRow = userList.length + 3; // 헤더 다음부터
+      const range = `${this.sheetName}!E${newRow}`;
+
+      const response = await this.sheetClient.spreadsheets.values.update({
+        spreadsheetId: this.spreadsheetId,
+        range: range,
+        valueInputOption: "RAW",
+        requestBody: {
+          values: [[trimmedName]],
+        },
+      });
+
+      return response.status === 200;
+    } catch (error) {
+      console.error("사용자 추가 오류:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 월별 전체 데이터를 한 번에 조회 (최적화된 버전)
+   */
+  public async getMonthlyFullData(): Promise<{
+    rawData: boolean[][];
+    userList: { name: string; row: number }[];
+    sheetName: string;
+    daysInMonth: number;
+    currentMonth: number;
+    currentYear: number;
+  }> {
+    try {
+      const today = new Date();
+      const sheetName = this.getSheetNameByDate(today);
+      const currentMonth = today.getMonth() + 1;
+      const currentYear = today.getFullYear();
+      const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+      // 사용자 목록 가져오기
+      const userList = await this.getUserList(sheetName);
+      if (userList.length === 0) {
+        return {
+          rawData: [],
+          userList: [],
+          sheetName,
+          daysInMonth,
+          currentMonth,
+          currentYear,
+        };
+      }
+
+      // 전체 체크인 데이터를 한 번에 가져오기 (F열부터 해당 월의 마지막 날까지)
+      const startColumn = "F"; // 1일
+      const endColumn = this.numberToColumnLetter(6 + daysInMonth - 1); // 마지막 날
+      const range = `${sheetName}!${startColumn}3:${endColumn}${
+        userList.length + 2
+      }`;
+
+      const response = await this.sheetClient.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: range,
+      });
+
+      const rawData: boolean[][] = [];
+      const values = response.data.values || [];
+
+      // 각 사용자별로 일별 체크인 상태를 boolean 배열로 변환
+      for (let userIndex = 0; userIndex < userList.length; userIndex++) {
+        const userRow = values[userIndex] || [];
+        const userDailyData: boolean[] = [];
+
+        for (let day = 0; day < daysInMonth; day++) {
+          const cellValue = userRow[day];
+          userDailyData.push(cellValue === true || cellValue === "TRUE");
+        }
+
+        rawData.push(userDailyData);
+      }
+
+      return {
+        rawData,
+        userList,
+        sheetName,
+        daysInMonth,
+        currentMonth,
+        currentYear,
+      };
+    } catch (error) {
+      console.error("월별 전체 데이터 조회 오류:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 월별 전체 통계 조회 (기존 호환성 유지)
+   */
+  public async getMonthlyStats(): Promise<{
+    dailyStats: { [date: string]: number };
+    weeklyStats: { [week: string]: number };
+    totalCount: number;
+    averageDaily: number;
+  }> {
+    try {
+      const fullData = await this.getMonthlyFullData();
+      const { rawData, daysInMonth, currentMonth, currentYear } = fullData;
+
+      // 일별 통계 계산
+      const dailyStats: { [date: string]: number } = {};
+      let totalCount = 0;
+
+      for (let day = 0; day < daysInMonth; day++) {
+        let dayCount = 0;
+        for (let userIndex = 0; userIndex < rawData.length; userIndex++) {
+          if (rawData[userIndex][day]) {
+            dayCount++;
+          }
+        }
+
+        const dateKey = `${currentYear}-${currentMonth
+          .toString()
+          .padStart(2, "0")}-${(day + 1).toString().padStart(2, "0")}`;
+        dailyStats[dateKey] = dayCount;
+        totalCount += dayCount;
+      }
+
+      // 주별 통계 계산
+      const weeklyStats: { [week: string]: number } = {};
+      for (let day = 1; day <= daysInMonth; day++) {
+        const weekOfMonth = Math.ceil(day / 7);
+        const weekKey = `${currentMonth}월 ${weekOfMonth}주차`;
+
+        const dateKey = `${currentYear}-${currentMonth
+          .toString()
+          .padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
+        weeklyStats[weekKey] =
+          (weeklyStats[weekKey] || 0) + (dailyStats[dateKey] || 0);
+      }
+
+      const averageDaily = totalCount / daysInMonth;
+
+      return {
+        dailyStats,
+        weeklyStats,
+        totalCount,
+        averageDaily: Math.round(averageDaily * 100) / 100,
+      };
+    } catch (error) {
+      console.error("월별 통계 조회 오류:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 날짜별 통계 조회
+   */
+  public async getStatsByDateRange(
+    startDate: string,
+    endDate: string
+  ): Promise<{ [date: string]: number }> {
+    try {
+      const allCheckIns = await this.getAllCheckIns();
+      const stats: { [date: string]: number } = {};
+
+      allCheckIns.forEach((checkIn) => {
+        const checkInDate = checkIn.date;
+        if (checkInDate >= startDate && checkInDate <= endDate) {
+          stats[checkInDate] = (stats[checkInDate] || 0) + 1;
+        }
+      });
+
+      return stats;
+    } catch (error) {
+      console.error("통계 조회 오류:", error);
+      throw error;
+    }
+  }
+}
