@@ -462,6 +462,131 @@ export class GoogleSpreadSheetService {
   /**
    * 월별 전체 데이터를 한 번에 조회 (최적화된 버전)
    */
+  /**
+   * 시트가 존재하는지 확인
+   */
+  private async sheetExists(sheetName: string): Promise<boolean> {
+    try {
+      const response = await this.sheetClient.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId,
+      });
+      
+      const sheets = response.data.sheets || [];
+      return sheets.some(sheet => sheet.properties?.title === sheetName);
+    } catch (error) {
+      console.error('시트 존재 확인 오류:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 이전 달 시트명 생성
+   */
+  private getPreviousMonthSheetName(currentDate: Date): string {
+    const prevMonth = new Date(currentDate);
+    prevMonth.setMonth(prevMonth.getMonth() - 1);
+    return this.getSheetNameByDate(prevMonth);
+  }
+
+  /**
+   * 시트 복사 (이전 달 → 현재 달)
+   */
+  private async copySheetFromPreviousMonth(currentSheetName: string, previousSheetName: string): Promise<void> {
+    try {
+      // 1. 이전 달 시트가 존재하는지 확인
+      const prevSheetExists = await this.sheetExists(previousSheetName);
+      if (!prevSheetExists) {
+        throw new Error(`이전 달 시트 '${previousSheetName}'가 존재하지 않습니다.`);
+      }
+
+      // 2. 스프레드시트 정보 가져오기
+      const spreadsheetResponse = await this.sheetClient.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId,
+      });
+
+      const sheets = spreadsheetResponse.data.sheets || [];
+      const sourceSheet = sheets.find(sheet => sheet.properties?.title === previousSheetName);
+      
+      if (!sourceSheet || !sourceSheet.properties?.sheetId) {
+        throw new Error(`이전 달 시트 '${previousSheetName}'를 찾을 수 없습니다.`);
+      }
+
+      // 3. 시트 복사
+      await this.sheetClient.spreadsheets.sheets.copyTo({
+        spreadsheetId: this.spreadsheetId,
+        sheetId: sourceSheet.properties.sheetId,
+        requestBody: {
+          destinationSpreadsheetId: this.spreadsheetId,
+        },
+      });
+
+      // 4. 복사된 시트의 이름을 현재 달로 변경
+      const updatedSpreadsheet = await this.sheetClient.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId,
+      });
+
+      const copiedSheet = updatedSpreadsheet.data.sheets?.find(sheet => 
+        sheet.properties?.title?.startsWith(`Copy of ${previousSheetName}`)
+      );
+
+      if (copiedSheet && copiedSheet.properties?.sheetId) {
+        await this.sheetClient.spreadsheets.batchUpdate({
+          spreadsheetId: this.spreadsheetId,
+          requestBody: {
+            requests: [{
+              updateSheetProperties: {
+                properties: {
+                  sheetId: copiedSheet.properties.sheetId,
+                  title: currentSheetName,
+                },
+                fields: 'title',
+              },
+            }],
+          },
+        });
+      }
+
+      // 5. 새 시트의 체크인 데이터 초기화 (사용자 목록은 유지, 체크인 데이터만 삭제)
+      await this.clearCheckInDataInNewSheet(currentSheetName);
+
+      console.log(`시트 '${previousSheetName}'를 복사하여 '${currentSheetName}' 시트를 생성했습니다.`);
+    } catch (error) {
+      console.error('시트 복사 오류:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 새 시트의 체크인 데이터 초기화 (F열부터 끝까지)
+   */
+  private async clearCheckInDataInNewSheet(sheetName: string): Promise<void> {
+    try {
+      // 사용자 목록 가져오기
+      const userList = await this.getUserList(sheetName);
+      if (userList.length === 0) return;
+
+      const today = new Date();
+      const currentMonth = today.getMonth() + 1;
+      const currentYear = today.getFullYear();
+      const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+      // F열부터 해당 월의 마지막 날까지 체크인 데이터 삭제
+      const startColumn = "F"; // 1일
+      const endColumn = this.numberToColumnLetter(6 + daysInMonth - 1); // 마지막 날
+      const range = `${sheetName}!${startColumn}3:${endColumn}${userList.length + 2}`;
+
+      await this.sheetClient.spreadsheets.values.clear({
+        spreadsheetId: this.spreadsheetId,
+        range: range,
+      });
+
+      console.log(`새 시트 '${sheetName}'의 체크인 데이터를 초기화했습니다.`);
+    } catch (error) {
+      console.error('체크인 데이터 초기화 오류:', error);
+      throw error;
+    }
+  }
+
   public async getMonthlyFullData(): Promise<{
     rawData: boolean[][];
     userList: { name: string; row: number }[];
@@ -476,6 +601,16 @@ export class GoogleSpreadSheetService {
       const currentMonth = today.getMonth() + 1;
       const currentYear = today.getFullYear();
       const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+      // 현재 달 시트가 존재하는지 확인
+      const currentSheetExists = await this.sheetExists(sheetName);
+      
+      if (!currentSheetExists) {
+        console.log(`현재 달 시트 '${sheetName}'가 존재하지 않습니다. 이전 달 시트를 복사합니다.`);
+        
+        const previousSheetName = this.getPreviousMonthSheetName(today);
+        await this.copySheetFromPreviousMonth(sheetName, previousSheetName);
+      }
 
       // 사용자 목록 가져오기
       const userList = await this.getUserList(sheetName);
