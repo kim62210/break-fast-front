@@ -15,10 +15,10 @@ export async function POST(request: NextRequest) {
 
     const checkInDate = new Date(checkInTime);
     const hours = checkInDate.getHours();
-
-    if (hours < 7 || hours >= 9) {
+    console.log(hours);
+    if (hours >= 10 || hours < 8) {
       return NextResponse.json(
-        { error: "조식 시간(07:00-09:00)에만 체크인 가능합니다." },
+        { error: "조식 시간(08:00-10:00)에만 체크인 가능합니다." },
         { status: 400 }
       );
     }

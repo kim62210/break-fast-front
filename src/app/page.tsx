@@ -185,7 +185,7 @@ export default function Home() {
 
   const isBreakfastTime = () => {
     const hours = currentTime.getHours()
-    return hours >= 7 && hours < 9
+    return hours >= 8 && hours < 10
   }
 
   const handleCheckIn = async () => {
@@ -201,7 +201,7 @@ export default function Home() {
     if (!isBreakfastTime()) {
       toast({
         title: "조식 시간이 아닙니다",
-        description: "조식은 07:00 ~ 09:00에 이용 가능합니다.",
+        description: "조식은 08:00 ~ 10:00에 이용 가능합니다.",
         variant: "destructive",
       })
       return
@@ -444,7 +444,7 @@ export default function Home() {
               {!isBreakfastTime() && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                   <p className="text-yellow-800 text-sm">
-                    조식 시간은 07:00 ~ 09:00입니다. 해당 시간에 체크인해주세요.
+                    조식 시간은 08:00 ~ 10:00입니다. 해당 시간에 체크인해주세요.
                   </p>
                 </div>
               )}
