@@ -488,7 +488,7 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div>
                   <h4 className="font-medium">체크인 가능 시간</h4>
-                  <p className="text-sm text-gray-600">현재: 07:00 - 09:00</p>
+                  <p className="text-sm text-gray-600">현재: 08:00 - 10:00</p>
                 </div>
                 <Button variant="outline">변경</Button>
               </div>

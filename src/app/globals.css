@@ -57,3 +57,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* 모바일 모달 최적화 */
+@media (max-width: 640px) {
+  [data-radix-dialog-content] {
+    position: fixed !important;
+    top: 1rem !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    margin: 0 !important;
+    width: calc(100vw - 2rem) !important;
+    max-width: calc(100vw - 2rem) !important;
+    max-height: calc(100vh - 2rem) !important;
+  }
+}

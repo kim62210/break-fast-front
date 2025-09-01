@@ -15,12 +15,12 @@ export async function POST(request: NextRequest) {
 
     const checkInDate = new Date(checkInTime);
     const hours = checkInDate.getHours();
-    console.log(hours);
-    if (hours >= 10 || hours < 8) {
-      return NextResponse.json(
-        { error: "조식 시간(08:00-10:00)에만 체크인 가능합니다." },
-        { status: 400 }
-      );
+    const isBreakfastTime = hours >= 8 && hours < 10;
+
+    // 조식시간 외라도 체크인은 허용하되, 경고 메시지 포함
+    let warningMessage = "";
+    if (!isBreakfastTime) {
+      warningMessage = "조식 시간(08:00-10:00) 외의 체크인입니다.";
     }
 
     // Google Sheets API 연동
@@ -48,6 +48,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: `${name}님의 체크인이 완료되었습니다.`,
+      warningMessage,
+      isBreakfastTime,
       checkInTime: checkInDate.toISOString(),
       data: {
         name,

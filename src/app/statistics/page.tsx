@@ -153,24 +153,24 @@ export default function StatisticsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="container mx-auto px-4 py-4 sm:py-8 max-w-7xl">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="flex justify-between items-center mb-8"
+        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8"
       >
-        <div>
-          <div className="flex items-center gap-4 mb-2">
+        <div className="w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 mb-2">
             <Link href="/">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
+              <Button variant="ghost" size="sm" className="mb-2 sm:mb-0">
+                <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                 메인으로
               </Button>
             </Link>
-            <h1 className="text-4xl font-bold text-gray-800">식수 통계</h1>
+            <h1 className="text-2xl sm:text-4xl font-bold text-gray-800">식수 통계</h1>
           </div>
-          <p className="text-gray-600">
+          <p className="text-sm sm:text-base text-gray-600">
             {format(new Date(), 'yyyy년 MM월', { locale: ko })} 조식 이용 통계
           </p>
         </div>
@@ -178,14 +178,15 @@ export default function StatisticsPage() {
           onClick={fetchMonthlyFullData}
           variant="outline"
           disabled={isLoading}
+          className="w-full sm:w-auto"
         >
-          <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`mr-2 h-3 w-3 sm:h-4 sm:w-4 ${isLoading ? 'animate-spin' : ''}`} />
           새로고침
         </Button>
       </motion.div>
 
       {/* 요약 카드들 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -193,11 +194,11 @@ export default function StatisticsPage() {
         >
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">월간 총 이용자</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-xs sm:text-sm font-medium">월간 총 이용자</CardTitle>
+              <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-lg sm:text-2xl font-bold">
                 {isLoading ? '...' : `${processedStats?.totalCount || 0}명`}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -214,11 +215,11 @@ export default function StatisticsPage() {
         >
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">일평균 이용자</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-xs sm:text-sm font-medium">일평균 이용자</CardTitle>
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-lg sm:text-2xl font-bold">
                 {isLoading ? '...' : `${processedStats?.averageDaily || 0}명`}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -235,11 +236,11 @@ export default function StatisticsPage() {
         >
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">최고 이용일</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-xs sm:text-sm font-medium">최고 이용일</CardTitle>
+              <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-lg sm:text-2xl font-bold">
                 {isLoading ? '...' : (
                   processedStats?.bestDay?.count && processedStats.bestDay.count > 0 ? `${processedStats.bestDay.day}일` : '-'
                 )}
@@ -260,11 +261,11 @@ export default function StatisticsPage() {
         >
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">마지막 업데이트</CardTitle>
-              <RefreshCw className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-xs sm:text-sm font-medium">마지막 업데이트</CardTitle>
+              <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-lg sm:text-2xl font-bold">
                 {format(lastUpdated, 'HH:mm')}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -278,8 +279,8 @@ export default function StatisticsPage() {
       {/* 통계 차트 */}
       <Tabs defaultValue="daily" className="space-y-4">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="daily">일별 통계</TabsTrigger>
-          <TabsTrigger value="weekly">주별 통계</TabsTrigger>
+          <TabsTrigger value="daily" className="text-xs sm:text-sm">일별 통계</TabsTrigger>
+          <TabsTrigger value="weekly" className="text-xs sm:text-sm">주별 통계</TabsTrigger>
         </TabsList>
 
         <TabsContent value="daily">
@@ -299,14 +300,14 @@ export default function StatisticsPage() {
                   <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {getDailyStatsArray().map(({ date, count, dayOfMonth }) => (
-                    <div key={date} className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <span className="w-12 text-sm font-medium">{dayOfMonth}일</span>
-                        <div className="w-64 bg-gray-200 rounded-full h-3">
+                    <div key={date} className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 sm:gap-4 flex-1">
+                        <span className="w-8 sm:w-12 text-xs sm:text-sm font-medium">{dayOfMonth}일</span>
+                        <div className="flex-1 max-w-32 sm:max-w-64 bg-gray-200 rounded-full h-2 sm:h-3">
                           <motion.div
-                            className="bg-primary h-3 rounded-full"
+                            className="bg-primary h-2 sm:h-3 rounded-full"
                             initial={{ width: 0 }}
                             animate={{ width: `${(count / getMaxCount()) * 100}%` }}
                             transition={{ duration: 0.8, delay: dayOfMonth * 0.02 }}
@@ -314,8 +315,8 @@ export default function StatisticsPage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <span className="text-lg font-bold">{count}명</span>
-                        <span className="text-sm text-gray-600 ml-2">
+                        <span className="text-sm sm:text-lg font-bold">{count}명</span>
+                        <span className="text-xs sm:text-sm text-gray-600 ml-1 sm:ml-2 hidden sm:inline">
                           ({Math.round((count / getMaxCount()) * 100)}%)
                         </span>
                       </div>
@@ -344,14 +345,14 @@ export default function StatisticsPage() {
                   <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   {getWeeklyStatsArray().map(({ week, count }, index) => (
-                    <div key={week} className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <span className="w-20 text-sm font-medium">{week}</span>
-                        <div className="w-64 bg-gray-200 rounded-full h-4">
+                    <div key={week} className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 sm:gap-4 flex-1">
+                        <span className="w-16 sm:w-20 text-xs sm:text-sm font-medium">{week}</span>
+                        <div className="flex-1 max-w-32 sm:max-w-64 bg-gray-200 rounded-full h-3 sm:h-4">
                           <motion.div
-                            className="bg-primary h-4 rounded-full"
+                            className="bg-primary h-3 sm:h-4 rounded-full"
                             initial={{ width: 0 }}
                             animate={{ width: `${(count / (processedStats?.totalCount || 1)) * 100}%` }}
                             transition={{ duration: 0.8, delay: index * 0.1 }}
@@ -359,8 +360,8 @@ export default function StatisticsPage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <span className="text-xl font-bold">{count}명</span>
-                        <span className="text-sm text-gray-600 ml-2">
+                        <span className="text-lg sm:text-xl font-bold">{count}명</span>
+                        <span className="text-xs sm:text-sm text-gray-600 ml-1 sm:ml-2 hidden sm:inline">
                           ({Math.round((count / (processedStats?.totalCount || 1)) * 100)}%)
                         </span>
                       </div>

@@ -198,14 +198,7 @@ export default function Home() {
       return
     }
 
-    if (!isBreakfastTime()) {
-      toast({
-        title: "조식 시간이 아닙니다",
-        description: "조식은 08:00 ~ 10:00에 이용 가능합니다.",
-        variant: "destructive",
-      })
-      return
-    }
+
 
     setIsCheckingIn(true)
 
@@ -232,10 +225,19 @@ export default function Home() {
       // 체크인 후 현황 업데이트
       fetchTodayCheckIns()
       
-      toast({
-        title: "체크인 완료!",
-        description: `${name}님의 조식 체크인이 완료되었습니다.`,
-      })
+      // 조식시간 외 경고 메시지가 있으면 경고 토스트, 없으면 일반 토스트
+      if (data.warningMessage) {
+        toast({
+          title: "체크인 완료!",
+          description: `${name}님의 체크인이 완료되었습니다. ${data.warningMessage}`,
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "체크인 완료!",
+          description: `${name}님의 조식 체크인이 완료되었습니다.`,
+        })
+      }
 
       setTimeout(() => {
         setShowSuccess(false)
@@ -255,29 +257,29 @@ export default function Home() {
   return (
     <>
       <WelcomeModal isOpen={isWelcomeModalOpen} onClose={closeWelcomeModal} />
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <div className="container mx-auto px-4 py-4 sm:py-8 max-w-6xl">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="text-center mb-8"
+        className="text-center mb-6 sm:mb-8"
       >
-        <div className="flex items-center justify-center gap-4 mb-4">
-          <h1 className="text-4xl font-bold text-gray-800 flex items-center gap-2">
-            <Coffee className="w-10 h-10 text-primary" />
-            조식 체크인 시스템
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 mb-4">
+          <h1 className="text-2xl sm:text-4xl font-bold text-gray-800 flex items-center gap-2">
+            <Coffee className="w-6 h-6 sm:w-10 sm:h-10 text-primary" />
+            <span className="text-center sm:text-left">조식 체크인 시스템</span>
           </h1>
-          <Link href="/statistics">
-            <Button variant="outline" size="sm">
-              <BarChart3 className="w-4 h-4 mr-2" />
+          <Link href="/statistics" className="mt-2 sm:mt-0">
+            <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+              <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               통계 보기
             </Button>
           </Link>
         </div>
-        <p className="text-gray-600">QR 코드로 간편하게 조식을 체크인하세요</p>
+        <p className="text-sm sm:text-base text-gray-600 px-4">QR 코드로 간편하게 조식을 체크인하세요</p>
       </motion.div>
 
-      <div className="grid md:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -292,13 +294,13 @@ export default function Home() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                <p className="text-lg">
+                <p className="text-sm sm:text-lg">
                   {format(currentTime, 'yyyy년 MM월 dd일 (EEEE)', { locale: ko })}
                 </p>
-                <p className="text-2xl font-bold text-primary">
+                <p className="text-xl sm:text-2xl font-bold text-primary">
                   {mounted ? format(currentTime, 'HH:mm:ss') : '--:--:--'}
                 </p>
-                <div className={`inline-block px-3 py-1 rounded-full text-sm ${
+                <div className={`inline-block px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm ${
                   isBreakfastTime() 
                     ? 'bg-green-100 text-green-700' 
                     : 'bg-gray-100 text-gray-700'
@@ -322,21 +324,22 @@ export default function Home() {
                   <Users className="w-5 h-5" />
                   이용 현황
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5 sm:gap-1">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={handlePreviousDay}
                     disabled={isLoadingStats}
+                    className="p-1 sm:p-2"
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    <ChevronLeft className="w-3 h-3 sm:w-4 sm:h-4" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={handleToday}
                     disabled={isLoadingStats}
-                    className="text-xs px-2"
+                    className="text-xs px-1 sm:px-2"
                   >
                     오늘
                   </Button>
@@ -345,8 +348,9 @@ export default function Home() {
                     size="sm"
                     onClick={handleNextDay}
                     disabled={isLoadingStats || isNextDayDisabled()}
+                    className="p-1 sm:p-2"
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />
                   </Button>
                 </div>
               </CardTitle>
@@ -362,18 +366,18 @@ export default function Home() {
                   className="space-y-2"
                 >
                   <div className="flex items-center justify-between">
-                    <p className="text-4xl font-bold text-primary">
+                    <p className="text-2xl sm:text-4xl font-bold text-primary">
                       {isLoadingStats ? (
-                        <Clock className="w-8 h-8 animate-spin" />
+                        <Clock className="w-6 h-6 sm:w-8 sm:h-8 animate-spin" />
                       ) : (
                         `${checkedInCount}명`
                       )}
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-xs sm:text-sm text-gray-500">
                       {format(selectedDate, 'MM월 dd일', { locale: ko })}
                     </p>
                   </div>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-xs sm:text-sm text-gray-600">
                     {selectedDate.toDateString() === new Date().toDateString() 
                       ? '오늘 조식을 이용한 인원' 
                       : '조식을 이용한 인원'
@@ -387,9 +391,12 @@ export default function Home() {
                       transition={{ duration: 0.8, delay: 0.2 }}
                     />
                   </div>
-                  <div className="flex justify-between items-center">
-                    <p className="text-xs text-gray-500">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0">
+                    <p className="text-xs text-gray-500 hidden sm:block">
                       ← → 키로 날짜 이동, Home키로 오늘
+                    </p>
+                    <p className="text-xs text-gray-500 sm:hidden">
+                      버튼으로 날짜 이동
                     </p>
                     <p className="text-xs text-gray-500">
                       최대 60명 기준
@@ -409,26 +416,26 @@ export default function Home() {
       >
         <Card className="relative overflow-hidden">
           <CardHeader>
-            <CardTitle className="text-2xl">체크인하기</CardTitle>
-            <CardDescription>이름을 입력하고 체크인 버튼을 눌러주세요</CardDescription>
+            <CardTitle className="text-2xl">조식 체크인</CardTitle>
+            <CardDescription>이름을 입력하고, 체크인 버튼을 눌러주세요</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Input
                   type="text"
                   placeholder="이름을 입력하세요"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleCheckIn()}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCheckIn()}
                   disabled={isCheckingIn || showSuccess}
-                  className="text-lg"
+                  className="text-base sm:text-lg flex-1"
                 />
                 <Button
                   onClick={handleCheckIn}
-                  disabled={isCheckingIn || showSuccess || !isBreakfastTime()}
+                  disabled={isCheckingIn || showSuccess}
                   size="lg"
-                  className="px-8"
+                  className="px-6 sm:px-8 w-full sm:w-auto"
                 >
                   {isCheckingIn ? (
                     <>
@@ -442,9 +449,9 @@ export default function Home() {
               </div>
               
               {!isBreakfastTime() && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-yellow-800 text-sm">
-                    조식 시간은 08:00 ~ 10:00입니다. 해당 시간에 체크인해주세요.
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                  <p className="text-orange-800 text-sm">
+                    <strong>조식 시간 외입니다.</strong> 조식 시간은 08:00 ~ 10:00이지만, 체크인은 언제든 가능합니다.
                   </p>
                 </div>
               )}
@@ -490,16 +497,16 @@ export default function Home() {
                   <li>• 초과 금액은 개인 부담</li>
                 </ul>
               </div>
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <h4 className="font-semibold mb-2 text-gray-700">이용 시간</h4>
-                  <p className="text-2xl font-bold text-primary">07:00 ~ 09:00</p>
-                  <p className="text-sm text-gray-600 mt-1">평일 운영 (주말/공휴일 제외)</p>
+                  <p className="text-xl sm:text-2xl font-bold text-primary">08:00 ~ 10:00</p>
+                  <p className="text-xs sm:text-sm text-gray-600 mt-1">평일 운영 (주말/공휴일 제외)</p>
                 </div>
                 <div>
                   <h4 className="font-semibold mb-2 text-gray-700">지원 금액</h4>
-                  <p className="text-2xl font-bold text-primary">3,000원</p>
-                  <p className="text-sm text-gray-600 mt-1">1인 1일 1회 한정</p>
+                  <p className="text-xl sm:text-2xl font-bold text-primary">3,000원</p>
+                  <p className="text-xs sm:text-sm text-gray-600 mt-1">1인 1일 1회 한정</p>
                 </div>
               </div>
             </div>
