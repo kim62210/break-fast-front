@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle, Coffee, Users, Clock, Calendar, ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react'
+import { CheckCircle, Coffee, Users, Clock, Calendar, ChevronLeft, ChevronRight, BarChart3, User } from 'lucide-react'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { useCheckInStore } from '@/store/checkInStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/use-toast'
 import Link from 'next/link'
 import WelcomeModal from '@/components/WelcomeModal'
@@ -21,6 +21,8 @@ export default function Home() {
   const [showSuccess, setShowSuccess] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [checkedInCount, setCheckedInCount] = useState(0)
+  const [checkedInUsers, setCheckedInUsers] = useState<any[]>([])
+  const [showUserList, setShowUserList] = useState(false)
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [isLoadingStats, setIsLoadingStats] = useState(false)
   const [monthlyData, setMonthlyData] = useState<any>(null)
@@ -77,6 +79,7 @@ export default function Home() {
       const data = await response.json()
       if (response.ok) {
         setCheckedInCount(data.count)
+        setCheckedInUsers(data.checkIns || [])
       }
     } catch (error) {
       console.error('체크인 현황 조회 실패:', error)
@@ -126,11 +129,13 @@ export default function Home() {
         
         if (response.ok) {
           setCheckedInCount(data.count)
+          setCheckedInUsers(data.checkIns || [])
         }
       } else if (monthlyData) {
         // 이전 날짜는 월별 데이터에서 계산
         const count = getCountForDate(date)
         setCheckedInCount(count)
+        setCheckedInUsers([]) // 이전 날짜는 상세 목록 없음
       } else {
         // 폴백: API 호출 (월별 데이터가 아직 로드되지 않은 경우)
         const day = date.getDate()
@@ -139,6 +144,7 @@ export default function Home() {
         
         if (response.ok) {
           setCheckedInCount(data.count)
+          setCheckedInUsers(data.checkIns || [])
         }
       }
     } catch (error) {
@@ -225,12 +231,11 @@ export default function Home() {
       // 체크인 후 현황 업데이트
       fetchTodayCheckIns()
       
-      // 조식시간 외 경고 메시지가 있으면 경고 토스트, 없으면 일반 토스트
+      // 조식시간 외라도 성공 토스트로 표시 (항상 초록색)
       if (data.warningMessage) {
         toast({
           title: "체크인 완료!",
           description: `${name}님의 체크인이 완료되었습니다. ${data.warningMessage}`,
-          variant: "destructive",
         })
       } else {
         toast({
@@ -356,54 +361,98 @@ export default function Home() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={selectedDate.toDateString()}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.3 }}
-                  className="space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-2xl sm:text-4xl font-bold text-primary">
-                      {isLoadingStats ? (
-                        <Clock className="w-6 h-6 sm:w-8 sm:h-8 animate-spin" />
-                      ) : (
-                        `${checkedInCount}명`
-                      )}
-                    </p>
-                    <p className="text-xs sm:text-sm text-gray-500">
-                      {format(selectedDate, 'MM월 dd일', { locale: ko })}
-                    </p>
+              <Tabs defaultValue="stats" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="stats">통계</TabsTrigger>
+                  <TabsTrigger value="users" disabled={checkedInUsers.length === 0}>
+                    인원 목록 ({checkedInUsers.length})
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="stats" className="mt-4">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={selectedDate.toDateString()}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      transition={{ duration: 0.3 }}
+                      className="space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="text-2xl sm:text-4xl font-bold text-primary">
+                          {isLoadingStats ? (
+                            <Clock className="w-6 h-6 sm:w-8 sm:h-8 animate-spin" />
+                          ) : (
+                            `${checkedInCount}명`
+                          )}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-500">
+                          {format(selectedDate, 'MM월 dd일', { locale: ko })}
+                        </p>
+                      </div>
+                      <p className="text-xs sm:text-sm text-gray-600">
+                        {selectedDate.toDateString() === new Date().toDateString() 
+                          ? '오늘 조식을 이용한 인원' 
+                          : '조식을 이용한 인원'
+                        }
+                      </p>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <motion.div 
+                          className="bg-primary h-2 rounded-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min((checkedInCount / 60) * 100, 100)}%` }}
+                          transition={{ duration: 0.8, delay: 0.2 }}
+                        />
+                      </div>
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0">
+                        <p className="text-xs text-gray-500 hidden sm:block">
+                          ← → 키로 날짜 이동, Home키로 오늘
+                        </p>
+                        <p className="text-xs text-gray-500 sm:hidden">
+                          버튼으로 날짜 이동
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          최대 60명 기준
+                        </p>
+                      </div>
+                    </motion.div>
+                  </AnimatePresence>
+                </TabsContent>
+                
+                <TabsContent value="users" className="mt-4">
+                  <div className="space-y-3">
+                    {checkedInUsers.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <User className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">체크인한 인원이 없습니다</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                        {checkedInUsers.map((user, index) => (
+                          <motion.div
+                            key={`${user.name}-${user.time}-${index}`}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.2, delay: index * 0.05 }}
+                            className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg"
+                          >
+                            <User className="w-4 h-4 text-gray-600" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {user.name}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {user.time}
+                              </p>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs sm:text-sm text-gray-600">
-                    {selectedDate.toDateString() === new Date().toDateString() 
-                      ? '오늘 조식을 이용한 인원' 
-                      : '조식을 이용한 인원'
-                    }
-                  </p>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <motion.div 
-                      className="bg-primary h-2 rounded-full"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min((checkedInCount / 60) * 100, 100)}%` }}
-                      transition={{ duration: 0.8, delay: 0.2 }}
-                    />
-                  </div>
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0">
-                    <p className="text-xs text-gray-500 hidden sm:block">
-                      ← → 키로 날짜 이동, Home키로 오늘
-                    </p>
-                    <p className="text-xs text-gray-500 sm:hidden">
-                      버튼으로 날짜 이동
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      최대 60명 기준
-                    </p>
-                  </div>
-                </motion.div>
-              </AnimatePresence>
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </motion.div>
@@ -493,7 +542,7 @@ export default function Home() {
                 <h4 className="font-semibold mb-2 text-blue-900">이용 방법</h4>
                 <ul className="text-sm text-blue-800 space-y-1">
                   <li>• 체크인 후 3,000원 한도 내에서 자유롭게 메뉴 선택</li>
-                  <li>• 구내식당 내 모든 메뉴 이용 가능</li>
+                  <li>• CU 편의점 내 모든 메뉴 이용 가능</li>
                   <li>• 초과 금액은 개인 부담</li>
                 </ul>
               </div>
