@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleSpreadSheetService } from "@/services/googleSheetsService";
+import { getKSTDate, formatKSTDate } from "@/lib/utils";
 
 export async function GET(
   request: NextRequest,
@@ -8,7 +9,7 @@ export async function GET(
   try {
     const { date } = params;
     const targetDay = parseInt(date);
-    const today = new Date();
+    const today = getKSTDate(); // KST 기준 오늘 날짜
     const targetDate = new Date(
       today.getFullYear(),
       today.getMonth(),
@@ -24,16 +25,14 @@ export async function GET(
 
     const googleSheetsService = GoogleSpreadSheetService.getInstance();
 
-    // 특정 날짜의 체크인 수와 목록 조회
+    // 특정 날짜의 체크인 수와 목록 조회 (KST 기준)
     const [checkInCount, checkIns] = await Promise.all([
       googleSheetsService.getCheckInCountByDate(targetDay),
-      googleSheetsService.getCheckInsByDate(
-        targetDate.toLocaleDateString("ko-KR")
-      ),
+      googleSheetsService.getCheckInsByDate(formatKSTDate(targetDate)),
     ]);
 
     return NextResponse.json({
-      date: targetDate.toLocaleDateString("ko-KR"),
+      date: formatKSTDate(targetDate),
       day: targetDay,
       count: checkInCount,
       checkIns: checkIns,

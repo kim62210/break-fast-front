@@ -13,30 +13,30 @@ import { useToast } from '@/components/ui/use-toast'
 import Link from 'next/link'
 import WelcomeModal from '@/components/WelcomeModal'
 import { useWelcomeModal } from '@/hooks/useWelcomeModal'
+import { getKSTDate, getKSTDayFromDate } from '@/lib/utils'
 
 export default function Home() {
   const [name, setName] = useState('')
-  const [currentTime, setCurrentTime] = useState(new Date())
+  const [currentTime, setCurrentTime] = useState(getKSTDate())
   const [isCheckingIn, setIsCheckingIn] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [checkedInCount, setCheckedInCount] = useState(0)
   const [checkedInUsers, setCheckedInUsers] = useState<any[]>([])
   const [showUserList, setShowUserList] = useState(false)
-  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [selectedDate, setSelectedDate] = useState(getKSTDate())
   const [isLoadingStats, setIsLoadingStats] = useState(false)
   const [monthlyData, setMonthlyData] = useState<any>(null)
+  const [monthlyDataCache, setMonthlyDataCache] = useState<Map<string, any>>(new Map())
   const { toast } = useToast()
   const { isOpen: isWelcomeModalOpen, closeModal: closeWelcomeModal } = useWelcomeModal()
 
   useEffect(() => {
     setMounted(true)
     const timer = setInterval(() => {
-      setCurrentTime(new Date())
+      setCurrentTime(getKSTDate())
     }, 1000)
     
-    // 실제 체크인 현황 조회
-    fetchTodayCheckIns()
     // 월별 전체 데이터 로드
     fetchMonthlyData()
     
@@ -57,7 +57,7 @@ export default function Home() {
       clearInterval(timer)
       window.removeEventListener('keydown', handleKeyPress)
     }
-  }, []) // selectedDate 의존성 제거
+  }, [])
 
   // selectedDate가 변경될 때 해당 날짜의 데이터 가져오기
   useEffect(() => {
@@ -66,10 +66,12 @@ export default function Home() {
 
   // 월별 데이터가 로드되면 현재 선택된 날짜의 데이터를 다시 가져오기
   useEffect(() => {
-    if (monthlyData && selectedDate.toDateString() !== new Date().toDateString()) {
+    if (monthlyData && selectedDate.toDateString() !== getKSTDate().toDateString()) {
       // 오늘이 아닌 날짜이고 월별 데이터가 있으면 클라이언트에서 계산
       const count = getCountForDate(selectedDate)
       setCheckedInCount(count)
+      setCheckedInUsers([]) // 이전 날짜는 상세 목록 없음
+      setIsLoadingStats(false) // 로딩 상태 해제
     }
   }, [monthlyData])
 
@@ -92,23 +94,68 @@ export default function Home() {
       const result = await response.json()
       if (response.ok && result.success) {
         setMonthlyData(result.data)
+        // 현재 월 데이터를 캐시에 저장
+        const today = getKSTDate()
+        const currentKey = `${today.getFullYear()}-${today.getMonth() + 1}`
+        setMonthlyDataCache(prev => new Map(prev.set(currentKey, result.data)))
       }
     } catch (error) {
       console.error('월별 데이터 조회 실패:', error)
     }
   }
 
-  const getCountForDate = (date: Date): number => {
-    if (!monthlyData) return 0
+  const fetchMonthlyDataByDate = async (date: Date) => {
+    const year = date.getFullYear()
+    const month = date.getMonth() + 1
+    const cacheKey = `${year}-${month}`
     
+    // 캐시에 있으면 캐시된 데이터 사용
+    if (monthlyDataCache.has(cacheKey)) {
+      return monthlyDataCache.get(cacheKey)
+    }
+
+    try {
+      const response = await fetch(`/api/monthly-data/${year}/${month}`)
+      const result = await response.json()
+      if (response.ok && result.success) {
+        // 캐시에 저장
+        setMonthlyDataCache(prev => new Map(prev.set(cacheKey, result.data)))
+        return result.data
+      }
+    } catch (error) {
+      console.error('월별 데이터 조회 실패:', error)
+    }
+    return null
+  }
+
+  const getCountForDate = (date: Date): number => {
+    const year = date.getFullYear()
+    const month = date.getMonth() + 1
     const day = date.getDate()
+    const cacheKey = `${year}-${month}`
+    
+    // 해당 월의 데이터 찾기
+    let targetData = null
+    
+    // 현재 월 데이터인지 확인
+    const today = getKSTDate()
+    const currentKey = `${today.getFullYear()}-${today.getMonth() + 1}`
+    
+    if (cacheKey === currentKey && monthlyData) {
+      targetData = monthlyData
+    } else if (monthlyDataCache.has(cacheKey)) {
+      targetData = monthlyDataCache.get(cacheKey)
+    }
+    
+    if (!targetData) return 0
+    
     const dayIndex = day - 1 // 0-based index
     
-    if (dayIndex < 0 || dayIndex >= monthlyData.daysInMonth) return 0
+    if (dayIndex < 0 || dayIndex >= targetData.daysInMonth) return 0
     
     let count = 0
-    for (let userIndex = 0; userIndex < monthlyData.rawData.length; userIndex++) {
-      if (monthlyData.rawData[userIndex][dayIndex]) {
+    for (let userIndex = 0; userIndex < targetData.rawData.length; userIndex++) {
+      if (targetData.rawData[userIndex][dayIndex]) {
         count++
       }
     }
@@ -119,32 +166,51 @@ export default function Home() {
   const fetchCheckInsByDate = async (date: Date) => {
     setIsLoadingStats(true)
     try {
-      const isToday = date.toDateString() === new Date().toDateString()
+      const isToday = date.toDateString() === getKSTDate().toDateString()
       
       if (isToday) {
         // 오늘 날짜는 실시간 API 호출
-        const day = date.getDate()
-        const response = await fetch(`/api/checkin/${day}`)
+        const response = await fetch('/api/checkin')
         const data = await response.json()
         
         if (response.ok) {
           setCheckedInCount(data.count)
           setCheckedInUsers(data.checkIns || [])
         }
-      } else if (monthlyData) {
-        // 이전 날짜는 월별 데이터에서 계산
-        const count = getCountForDate(date)
-        setCheckedInCount(count)
-        setCheckedInUsers([]) // 이전 날짜는 상세 목록 없음
       } else {
-        // 폴백: API 호출 (월별 데이터가 아직 로드되지 않은 경우)
-        const day = date.getDate()
-        const response = await fetch(`/api/checkin/${day}`)
-        const data = await response.json()
+        // 이전 날짜는 월별 데이터에서 계산
+        const year = date.getFullYear()
+        const month = date.getMonth() + 1
+        const cacheKey = `${year}-${month}`
         
-        if (response.ok) {
-          setCheckedInCount(data.count)
-          setCheckedInUsers(data.checkIns || [])
+        // 해당 월 데이터가 캐시에 있는지 확인
+        let targetData = null
+        const today = getKSTDate()
+        const currentKey = `${today.getFullYear()}-${today.getMonth() + 1}`
+        
+        if (cacheKey === currentKey && monthlyData) {
+          targetData = monthlyData
+        } else if (monthlyDataCache.has(cacheKey)) {
+          targetData = monthlyDataCache.get(cacheKey)
+        } else {
+          // 해당 월 데이터를 가져오기
+          targetData = await fetchMonthlyDataByDate(date)
+        }
+        
+        if (targetData) {
+          const count = getCountForDate(date)
+          setCheckedInCount(count)
+          setCheckedInUsers([]) // 이전 날짜는 상세 목록 없음
+        } else {
+          // 폴백: API 호출
+          const day = getKSTDayFromDate(date)
+          const response = await fetch(`/api/checkin/${day}`)
+          const data = await response.json()
+          
+          if (response.ok) {
+            setCheckedInCount(data.count)
+            setCheckedInUsers(data.checkIns || [])
+          }
         }
       }
     } catch (error) {
@@ -158,35 +224,32 @@ export default function Home() {
     const prevDate = new Date(selectedDate)
     prevDate.setDate(prevDate.getDate() - 1)
     setSelectedDate(prevDate)
-    fetchCheckInsByDate(prevDate)
   }
 
   const handleNextDay = () => {
     const nextDate = new Date(selectedDate)
     nextDate.setDate(nextDate.getDate() + 1)
     
-    // 미래 날짜는 오늘까지만 허용
-    const today = new Date()
+    // 미래 날짜는 오늘까지만 허용 (KST 기준)
+    const today = getKSTDate()
     today.setHours(23, 59, 59, 999) // 오늘 끝까지
     
     if (nextDate <= today) {
       setSelectedDate(nextDate)
-      fetchCheckInsByDate(nextDate)
     }
   }
 
   const isNextDayDisabled = () => {
     const nextDate = new Date(selectedDate)
     nextDate.setDate(nextDate.getDate() + 1)
-    const today = new Date()
+    const today = getKSTDate()
     today.setHours(23, 59, 59, 999)
     return nextDate > today
   }
 
   const handleToday = () => {
-    const today = new Date()
+    const today = getKSTDate()
     setSelectedDate(today)
-    fetchTodayCheckIns()
   }
 
   const isBreakfastTime = () => {
@@ -228,8 +291,11 @@ export default function Home() {
 
       setShowSuccess(true)
       
-      // 체크인 후 현황 업데이트
-      fetchTodayCheckIns()
+      // 체크인 후 현황 업데이트 - 현재 선택된 날짜가 오늘인 경우에만
+      const today = getKSTDate()
+      if (selectedDate.toDateString() === today.toDateString()) {
+        fetchCheckInsByDate(selectedDate)
+      }
       
       // 조식시간 외라도 성공 토스트로 표시 (항상 초록색)
       if (data.warningMessage) {
@@ -392,7 +458,7 @@ export default function Home() {
                         </p>
                       </div>
                       <p className="text-xs sm:text-sm text-gray-600">
-                        {selectedDate.toDateString() === new Date().toDateString() 
+                        {selectedDate.toDateString() === getKSTDate().toDateString() 
                           ? '오늘 조식을 이용한 인원' 
                           : '조식을 이용한 인원'
                         }

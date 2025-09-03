@@ -71,6 +71,7 @@ export default function StatisticsPage() {
     let totalCount = 0
     let maxDailyCount = 0
     let bestDay = { day: 0, count: 0 }
+    let daysWithCheckIns = 0 // 1명 이상 체크인한 날짜 수
     
     for (let day = 0; day < daysInMonth; day++) {
       let dayCount = 0
@@ -83,6 +84,11 @@ export default function StatisticsPage() {
       const dateKey = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-${(day + 1).toString().padStart(2, '0')}`
       dailyStats[dateKey] = dayCount
       totalCount += dayCount
+      
+      // 1명 이상 체크인한 날짜 카운트
+      if (dayCount > 0) {
+        daysWithCheckIns++
+      }
       
       if (dayCount > maxDailyCount) {
         maxDailyCount = dayCount
@@ -100,7 +106,8 @@ export default function StatisticsPage() {
       weeklyStats[weekKey] = (weeklyStats[weekKey] || 0) + (dailyStats[dateKey] || 0)
     }
     
-    const averageDaily = totalCount / daysInMonth
+    // 1명 이상 체크인한 날짜가 있을 때만 평균 계산
+    const averageDaily = daysWithCheckIns > 0 ? totalCount / daysWithCheckIns : 0
     
     return {
       dailyStats,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleSpreadSheetService } from "@/services/googleSheetsService";
+import { getKSTDate, formatKSTDate } from "@/lib/utils";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,8 +14,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const checkInDate = new Date(checkInTime);
-    const hours = checkInDate.getHours();
+    // KST 기준으로 체크인 시간 처리
+    const kstCheckInDate = getKSTDate(); // 실제 체크인은 항상 KST 기준 현재 시간
+    const hours = kstCheckInDate.getHours();
     const isBreakfastTime = hours >= 8 && hours < 10;
 
     // 조식시간 외라도 체크인은 허용하되, 경고 메시지 포함
@@ -29,9 +31,9 @@ export async function POST(request: NextRequest) {
 
       const checkInData = {
         name,
-        date: checkInDate.toLocaleDateString("ko-KR"),
-        time: checkInDate.toLocaleTimeString("ko-KR"),
-        timestamp: checkInDate.toISOString(),
+        date: formatKSTDate(kstCheckInDate),
+        time: kstCheckInDate.toLocaleTimeString("ko-KR"),
+        timestamp: kstCheckInDate.toISOString(),
       };
 
       await googleSheetsService.addCheckIn(checkInData);
@@ -50,11 +52,11 @@ export async function POST(request: NextRequest) {
       message: `${name}님의 체크인이 완료되었습니다.`,
       warningMessage,
       isBreakfastTime,
-      checkInTime: checkInDate.toISOString(),
+      checkInTime: kstCheckInDate.toISOString(),
       data: {
         name,
-        date: checkInDate.toLocaleDateString("ko-KR"),
-        time: checkInDate.toLocaleTimeString("ko-KR"),
+        date: formatKSTDate(kstCheckInDate),
+        time: kstCheckInDate.toLocaleTimeString("ko-KR"),
       },
     });
   } catch (error: any) {
@@ -67,20 +69,18 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  // 오늘의 체크인 목록 조회
+  // 오늘의 체크인 목록 조회 (KST 기준)
   try {
     const googleSheetsService = GoogleSpreadSheetService.getInstance();
-    const today = new Date().toLocaleDateString("ko-KR");
+    const today = formatKSTDate(getKSTDate());
 
-    // 오늘 체크인 수와 목록을 모두 조회
-    const [checkInCount, checkIns] = await Promise.all([
-      googleSheetsService.getTodayCheckInCount(),
-      googleSheetsService.getCheckInsByDate(today),
-    ]);
+    // 오늘 체크인 목록을 조회하고 개수는 계산으로 처리
+    const checkIns = await googleSheetsService.getCheckInsByDate(today);
+    const checkInCount = checkIns.length;
 
     return NextResponse.json({
       date: today,
-      count: checkInCount, // 실제 체크된 셀의 개수
+      count: checkInCount, // 체크인 목록의 길이로 계산
       checkIns: checkIns, // 체크인한 사용자 목록
     });
   } catch (error: any) {

@@ -1,4 +1,5 @@
 import { google, sheets_v4, drive_v3 } from "googleapis";
+import { getKSTDate, getKSTDayFromDate } from "@/lib/utils";
 
 /** 구글 스프레드 서비스 상수 */
 const GOOGLE_SHEET_CONSTANT = {
@@ -26,9 +27,13 @@ export class GoogleSpreadSheetService {
   private readonly sheetClient: sheets_v4.Sheets;
   private readonly spreadsheetId: string;
   private readonly sheetName: string;
+  private userListCache: Map<
+    string,
+    { data: SheetUserData[]; timestamp: number }
+  > = new Map();
+  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5분 캐시
 
   constructor() {
-    // 환경 변수에서 PEM 키의 \\n을 실제 줄바꿈으로 변환
     const privateKey = process.env.GOOGLE_SPREAD_API_PEM_KEY?.replace(
       /\\n/g,
       "\n"
@@ -72,10 +77,10 @@ export class GoogleSpreadSheetService {
   }
 
   /**
-   * 현재 월에 맞는 시트명 생성 (YY.MM 형식)
+   * 현재 월에 맞는 시트명 생성 (YY.MM 형식) - KST 기준
    */
   private getCurrentSheetName(): string {
-    const now = new Date();
+    const now = getKSTDate(); // KST 기준 현재 시간
     const year = now.getFullYear().toString().slice(-2); // 24, 25 등
     const month = (now.getMonth() + 1).toString().padStart(2, "0"); // 01, 02 등
     return `${year}.${month}`;
@@ -91,10 +96,18 @@ export class GoogleSpreadSheetService {
   }
 
   /**
-   * E열에서 사용자 목록과 행 번호 가져오기 (3글자 이름만 필터링)
+   * E열에서 사용자 목록과 행 번호 가져오기 (3글자 이름만 필터링, 캐싱 적용)
    */
   private async getUserList(sheetName: string): Promise<SheetUserData[]> {
     try {
+      // 캐시 확인
+      const cached = this.userListCache.get(sheetName);
+      const now = Date.now();
+
+      if (cached && now - cached.timestamp < this.CACHE_DURATION) {
+        return cached.data;
+      }
+
       const response = await this.sheetClient.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: `${sheetName}!E:E`,
@@ -120,6 +133,12 @@ export class GoogleSpreadSheetService {
           }
         }
       }
+
+      // 캐시에 저장
+      this.userListCache.set(sheetName, {
+        data: userList,
+        timestamp: now,
+      });
 
       return userList;
     } catch (error) {
@@ -163,7 +182,7 @@ export class GoogleSpreadSheetService {
       const trimmedName = checkInData.name.trim();
       const checkInDate = new Date(checkInData.timestamp);
       const sheetName = this.getSheetNameByDate(checkInDate);
-      const day = checkInDate.getDate();
+      const day = getKSTDayFromDate(checkInDate); // KST 기준 날짜
 
       // 중복 체크
       const isDuplicate = await this.isDuplicateCheckIn(
@@ -208,11 +227,11 @@ export class GoogleSpreadSheetService {
   }
 
   /**
-   * 특정 날짜 컬럼에서 체크인된 사용자 수 조회
+   * 특정 날짜 컬럼에서 체크인된 사용자 수 조회 (KST 기준)
    */
   public async getCheckInCountByDate(targetDay: number): Promise<number> {
     try {
-      const today = new Date();
+      const today = getKSTDate(); // KST 기준 오늘 날짜
       const sheetName = this.getSheetNameByDate(today);
       const targetColumn = this.getColumnByDate(targetDay);
 
@@ -251,10 +270,10 @@ export class GoogleSpreadSheetService {
   }
 
   /**
-   * 오늘 날짜 컬럼에서 체크인된 사용자 수 조회
+   * 오늘 날짜 컬럼에서 체크인된 사용자 수 조회 (KST 기준)
    */
   public async getTodayCheckInCount(): Promise<number> {
-    const today = new Date();
+    const today = getKSTDate(); // KST 기준 오늘 날짜
     return this.getCheckInCountByDate(today.getDate());
   }
 
@@ -276,8 +295,8 @@ export class GoogleSpreadSheetService {
         targetDate = new Date(year, month, day);
         targetDay = day;
       } else {
-        // 현재 날짜 사용
-        targetDate = new Date();
+        // 현재 날짜 사용 (KST 기준)
+        targetDate = getKSTDate();
         targetDay = targetDate.getDate();
       }
 
@@ -355,12 +374,12 @@ export class GoogleSpreadSheetService {
   }
 
   /**
-   * 중복 체크인 확인
+   * 중복 체크인 확인 (KST 기준)
    */
   private async isDuplicateCheckIn(name: string, date: Date): Promise<boolean> {
     try {
       const sheetName = this.getSheetNameByDate(date);
-      const day = date.getDate();
+      const day = getKSTDayFromDate(date); // KST 기준 날짜
 
       // 사용자 목록에서 해당 이름의 행 찾기
       const userList = await this.getUserList(sheetName);
@@ -578,7 +597,7 @@ export class GoogleSpreadSheetService {
       const userList = await this.getUserList(sheetName);
       if (userList.length === 0) return;
 
-      const today = new Date();
+      const today = getKSTDate(); // KST 기준 오늘 날짜
       const currentMonth = today.getMonth() + 1;
       const currentYear = today.getFullYear();
       const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
@@ -619,6 +638,93 @@ export class GoogleSpreadSheetService {
     }
   }
 
+  /**
+   * 특정 월의 전체 데이터 조회
+   */
+  public async getMonthlyFullDataByDate(targetDate: Date): Promise<{
+    rawData: boolean[][];
+    userList: { name: string; row: number }[];
+    sheetName: string;
+    daysInMonth: number;
+    currentMonth: number;
+    currentYear: number;
+  }> {
+    try {
+      const sheetName = this.getSheetNameByDate(targetDate);
+      const currentMonth = targetDate.getMonth() + 1;
+      const currentYear = targetDate.getFullYear();
+      const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+      // 해당 월 시트가 존재하는지 확인
+      const sheetExists = await this.sheetExists(sheetName);
+
+      if (!sheetExists) {
+        console.log(`시트 '${sheetName}'가 존재하지 않습니다.`);
+        return {
+          rawData: [],
+          userList: [],
+          sheetName,
+          daysInMonth,
+          currentMonth,
+          currentYear,
+        };
+      }
+
+      // 사용자 목록 가져오기
+      const userList = await this.getUserList(sheetName);
+      if (userList.length === 0) {
+        return {
+          rawData: [],
+          userList: [],
+          sheetName,
+          daysInMonth,
+          currentMonth,
+          currentYear,
+        };
+      }
+
+      // 전체 체크인 데이터를 한 번에 가져오기 (F열부터 해당 월의 마지막 날까지)
+      const startColumn = "F"; // 1일
+      const endColumn = this.numberToColumnLetter(6 + daysInMonth - 1); // 마지막 날
+      const range = `${sheetName}!${startColumn}3:${endColumn}${
+        userList.length + 2
+      }`;
+
+      const response = await this.sheetClient.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: range,
+      });
+
+      const rawData: boolean[][] = [];
+      const values = response.data.values || [];
+
+      // 각 사용자별로 일별 체크인 상태를 boolean 배열로 변환
+      for (let userIndex = 0; userIndex < userList.length; userIndex++) {
+        const userRow = values[userIndex] || [];
+        const userDailyData: boolean[] = [];
+
+        for (let day = 0; day < daysInMonth; day++) {
+          const cellValue = userRow[day];
+          userDailyData.push(cellValue === true || cellValue === "TRUE");
+        }
+
+        rawData.push(userDailyData);
+      }
+
+      return {
+        rawData,
+        userList,
+        sheetName,
+        daysInMonth,
+        currentMonth,
+        currentYear,
+      };
+    } catch (error) {
+      console.error("월별 전체 데이터 조회 오류:", error);
+      throw error;
+    }
+  }
+
   public async getMonthlyFullData(): Promise<{
     rawData: boolean[][];
     userList: { name: string; row: number }[];
@@ -628,7 +734,7 @@ export class GoogleSpreadSheetService {
     currentYear: number;
   }> {
     try {
-      const today = new Date();
+      const today = getKSTDate(); // KST 기준 오늘 날짜
       const sheetName = this.getSheetNameByDate(today);
       const currentMonth = today.getMonth() + 1;
       const currentYear = today.getFullYear();
@@ -717,6 +823,7 @@ export class GoogleSpreadSheetService {
       // 일별 통계 계산
       const dailyStats: { [date: string]: number } = {};
       let totalCount = 0;
+      let daysWithCheckIns = 0; // 1명 이상 체크인한 날짜 수
 
       for (let day = 0; day < daysInMonth; day++) {
         let dayCount = 0;
@@ -731,6 +838,11 @@ export class GoogleSpreadSheetService {
           .padStart(2, "0")}-${(day + 1).toString().padStart(2, "0")}`;
         dailyStats[dateKey] = dayCount;
         totalCount += dayCount;
+
+        // 1명 이상 체크인한 날짜 카운트
+        if (dayCount > 0) {
+          daysWithCheckIns++;
+        }
       }
 
       // 주별 통계 계산
@@ -746,7 +858,9 @@ export class GoogleSpreadSheetService {
           (weeklyStats[weekKey] || 0) + (dailyStats[dateKey] || 0);
       }
 
-      const averageDaily = totalCount / daysInMonth;
+      // 1명 이상 체크인한 날짜가 있을 때만 평균 계산
+      const averageDaily =
+        daysWithCheckIns > 0 ? totalCount / daysWithCheckIns : 0;
 
       return {
         dailyStats,
