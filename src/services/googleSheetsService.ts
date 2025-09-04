@@ -282,17 +282,19 @@ export class GoogleSpreadSheetService {
    */
   public async getCheckInsByDate(date: string): Promise<CheckInData[]> {
     try {
-      // 한국 날짜 형식을 Date 객체로 변환 (예: "2024. 1. 15.")
+      // 한국 날짜 형식을 KST Date 객체로 변환 (예: "2024. 1. 15.")
       let targetDate: Date;
       let targetDay: number;
 
       if (date.includes(". ")) {
-        // "2024. 1. 15." 형식
+        // "2024. 1. 15." 형식을 파싱
         const dateParts = date.replace(/\.$/, "").split(". ");
         const year = parseInt(dateParts[0]);
         const month = parseInt(dateParts[1]) - 1; // JavaScript 월은 0부터 시작
         const day = parseInt(dateParts[2]);
-        targetDate = new Date(year, month, day);
+
+        // 명시적으로 KST 기준 날짜 생성
+        targetDate = new Date(year, month, day, 12, 0, 0); // 정오로 설정
         targetDay = day;
       } else {
         // 현재 날짜 사용 (KST 기준)

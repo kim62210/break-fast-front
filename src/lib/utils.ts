@@ -6,38 +6,58 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * 현재 날짜를 반환 (프론트엔드 로컬타임이 KST이므로 변환 불필요)
+ * KST 기준 현재 날짜를 반환
+ * 서버/클라이언트 환경에 관계없이 항상 KST 시간을 반환
  */
 export function getKSTDate(): Date {
-  return new Date();
+  // 클라이언트 환경에서는 로컬타임이 KST이므로 변환 불필요
+  if (typeof window !== "undefined") {
+    return new Date();
+  }
+
+  // 서버 환경에서는 명시적으로 KST로 변환
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+  const kst = new Date(utc + 9 * 60 * 60 * 1000); // UTC+9
+  return kst;
 }
 
 /**
- * 주어진 Date 객체를 그대로 반환 (프론트엔드 로컬타임이 KST이므로 변환 불필요)
+ * 주어진 Date 객체를 KST 기준으로 변환
  */
 export function toKSTDate(date: Date): Date {
-  return date;
+  // 클라이언트 환경에서는 로컬타임이 KST이므로 변환 불필요
+  if (typeof window !== "undefined") {
+    return date;
+  }
+
+  // 서버 환경에서는 명시적으로 KST로 변환
+  const utc = date.getTime() + date.getTimezoneOffset() * 60000;
+  const kst = new Date(utc + 9 * 60 * 60 * 1000); // UTC+9
+  return kst;
 }
 
 /**
- * 오늘 날짜의 일(day) 반환
+ * KST 기준 오늘 날짜의 일(day) 반환
  */
 export function getKSTDay(): number {
-  return new Date().getDate();
+  return getKSTDate().getDate();
 }
 
 /**
- * 특정 날짜의 일(day) 반환
+ * KST 기준 특정 날짜의 일(day) 반환
  */
 export function getKSTDayFromDate(date: Date): number {
-  return date.getDate();
+  return toKSTDate(date).getDate();
 }
 
 /**
- * 날짜 문자열을 한국 형식으로 반환 (예: "2024. 1. 15.")
+ * 날짜를 한국 형식으로 반환 (예: "2024. 1. 15.")
+ * KST 기준으로 변환 후 포맷팅
  */
 export function formatKSTDate(date: Date): string {
-  return date.toLocaleDateString("ko-KR");
+  const kstDate = toKSTDate(date);
+  return kstDate.toLocaleDateString("ko-KR");
 }
 
 /**

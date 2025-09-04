@@ -10,10 +10,15 @@ export async function GET(
     const { date } = params;
     const targetDay = parseInt(date);
     const today = getKSTDate(); // KST 기준 오늘 날짜
+
+    // KST 기준으로 해당 월의 특정 날짜 생성
     const targetDate = new Date(
       today.getFullYear(),
       today.getMonth(),
-      targetDay
+      targetDay,
+      12,
+      0,
+      0 // 정오로 설정하여 날짜 경계 문제 방지
     );
 
     if (isNaN(targetDay) || targetDay < 1 || targetDay > 31) {
