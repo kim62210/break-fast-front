@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CheckCircle, Coffee, Users, Clock, Calendar, ChevronLeft, ChevronRight, BarChart3, User } from 'lucide-react'
 import { format } from 'date-fns'
@@ -14,15 +14,18 @@ import { useToast } from '@/components/ui/use-toast'
 import Link from 'next/link'
 import WelcomeModal from '@/components/WelcomeModal'
 import { useWelcomeModal } from '@/hooks/useWelcomeModal'
-import { getKSTDate, getKSTDayFromDate, getSavedName, saveName, removeSavedName, getRememberNameSetting, setRememberNameSetting } from '@/lib/utils'
+import { getKSTDate, getKSTDayFromDate, getSavedName, saveName, removeSavedName, getRememberNameSetting, setRememberNameSetting, getAutoCheckinSetting, setAutoCheckinSetting } from '@/lib/utils'
 
 export default function Home() {
   const [name, setName] = useState('')
   const [rememberName, setRememberName] = useState(false)
+  const [autoCheckin, setAutoCheckin] = useState(false)
   const [currentTime, setCurrentTime] = useState(getKSTDate())
   const [isCheckingIn, setIsCheckingIn] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false)
+  const autoCheckinAttempted = useRef(false)
   const [checkedInCount, setCheckedInCount] = useState(0)
   const [checkedInUsers, setCheckedInUsers] = useState<any[]>([])
   const [showUserList, setShowUserList] = useState(false)
@@ -42,11 +45,13 @@ export default function Home() {
     // 저장된 이름과 설정 불러오기
     const savedName = getSavedName()
     const rememberSetting = getRememberNameSetting()
+    const autoCheckinSetting = getAutoCheckinSetting()
     
     if (rememberSetting && savedName) {
       setName(savedName)
     }
     setRememberName(rememberSetting)
+    setAutoCheckin(autoCheckinSetting)
     
     // 월별 전체 데이터 로드
     fetchMonthlyData()
@@ -69,6 +74,26 @@ export default function Home() {
       window.removeEventListener('keydown', handleKeyPress)
     }
   }, [])
+
+  // 자동 체크인 로직 - 페이지 진입 시 한 번만 실행
+  useEffect(() => {
+    if (
+      mounted && 
+      initialDataLoaded &&
+      autoCheckin && 
+      name.trim() && 
+      !isCheckingIn && 
+      !showSuccess && 
+      !isLoadingStats &&
+      !autoCheckinAttempted.current
+    ) {
+      // 자동 체크인 시도 기록
+      autoCheckinAttempted.current = true
+      // 모든 초기 데이터가 로드된 후 자동 체크인 실행
+      handleCheckIn()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, initialDataLoaded, autoCheckin, name, isCheckingIn, showSuccess, isLoadingStats])
 
   // selectedDate가 변경될 때 해당 날짜의 데이터 가져오기
   useEffect(() => {
@@ -99,6 +124,8 @@ export default function Home() {
       }
     } catch (error) {
       console.error('월별 데이터 조회 실패:', error)
+    } finally {
+      setInitialDataLoaded(true)
     }
   }
 
@@ -261,6 +288,11 @@ export default function Home() {
       // 체크박스를 비활성화하면 저장된 이름 삭제
       removeSavedName()
     }
+  }
+
+  const handleAutoCheckinChange = (checked: boolean) => {
+    setAutoCheckin(checked)
+    setAutoCheckinSetting(checked)
   }
 
   const isBreakfastTime = () => {
@@ -582,21 +614,46 @@ export default function Home() {
                 </Button>
               </div>
               
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="remember-name"
-                  checked={rememberName}
-                  onCheckedChange={handleRememberNameChange}
-                  disabled={isCheckingIn || showSuccess}
-                />
-                <label 
-                  htmlFor="remember-name" 
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                >
-                  이름 저장하기
-                </label>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="remember-name"
+                    checked={rememberName}
+                    onCheckedChange={handleRememberNameChange}
+                    disabled={isCheckingIn || showSuccess}
+                  />
+                  <label 
+                    htmlFor="remember-name" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    이름 저장하기
+                  </label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="auto-checkin"
+                    checked={autoCheckin}
+                    onCheckedChange={handleAutoCheckinChange}
+                    disabled={isCheckingIn || showSuccess}
+                  />
+                  <label 
+                    htmlFor="auto-checkin" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    자동 체크인하기
+                  </label>
+                </div>
               </div>
               
+              {autoCheckin && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-blue-800 text-sm">
+                    <strong>자동 체크인이 활성화되었습니다.</strong> 저장된 이름이 있을 때 페이지 접근 시 자동으로 체크인됩니다.
+                  </p>
+                </div>
+              )}
+
               {!isBreakfastTime() && (
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
                   <p className="text-orange-800 text-sm">

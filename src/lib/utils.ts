@@ -66,6 +66,7 @@ export function formatKSTDate(date: Date): string {
 const STORAGE_KEYS = {
   SAVED_NAME: "breakfast-check-saved-name",
   REMEMBER_NAME: "breakfast-check-remember-name",
+  AUTO_CHECKIN: "breakfast-check-auto-checkin",
 } as const;
 
 /**
@@ -123,6 +124,30 @@ export function setRememberNameSetting(remember: boolean): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEYS.REMEMBER_NAME, remember.toString());
+  } catch {
+    // localStorage 오류 무시
+  }
+}
+
+/**
+ * 자동 체크인 설정을 가져옴
+ */
+export function getAutoCheckinSetting(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(STORAGE_KEYS.AUTO_CHECKIN) === "true";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 자동 체크인 설정을 저장
+ */
+export function setAutoCheckinSetting(autoCheckin: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_KEYS.AUTO_CHECKIN, autoCheckin.toString());
   } catch {
     // localStorage 오류 무시
   }

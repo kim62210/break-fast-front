@@ -4,6 +4,7 @@ QR 코드를 통한 간편한 조식 체크인 시스템입니다.
 
 ## 🆕 최신 업데이트
 
+- ✅ **자동 체크인 기능**: 페이지 접근 시 저장된 이름으로 자동 체크인하는 기능 추가
 - ✅ **이름 저장 기능**: 체크박스를 통해 사용자 이름을 localStorage에 저장하여 재입력 불필요
 - ✅ **KST 시간 처리 개선**: 프론트엔드 로컬타임(KST)과 구글 스프레드시트 API(UTC) 간 정확한 시간 변환
 - ✅ **월별 데이터 캐싱**: 이전 날짜 조회 시 월별 데이터를 캐싱하여 성능 향상
@@ -14,6 +15,7 @@ QR 코드를 통한 간편한 조식 체크인 시스템입니다.
 
 - ✅ QR 코드 스캔을 통한 빠른 접속
 - ✅ 원클릭 체크인 (이름 자동 저장/불러오기)
+- ✅ 자동 체크인 (페이지 접근 시 자동 체크인)
 - ✅ 실시간 이용 현황 확인
 - ✅ 날짜별 체크인 현황 조회 (← → 키보드 네비게이션)
 - ✅ Google Sheets 연동 (정확한 KST/UTC 시간 처리)
@@ -204,17 +206,26 @@ breakfast-check/
 
 ## 개발 가이드
 
-### 이름 저장 기능 (localStorage)
+### 이름 저장 및 자동 체크인 기능 (localStorage)
 
-체크인 페이지에서 사용자는 "이름 저장하기" 체크박스를 통해 이름을 저장할 수 있습니다:
+체크인 페이지에서 사용자는 "이름 저장하기"와 "자동 체크인하기" 체크박스를 통해 편의 기능을 사용할 수 있습니다:
 
 ```tsx
 // localStorage 유틸리티 함수 사용
-import { getSavedName, saveName, removeSavedName, getRememberNameSetting, setRememberNameSetting } from '@/lib/utils'
+import { 
+  getSavedName, 
+  saveName, 
+  removeSavedName, 
+  getRememberNameSetting, 
+  setRememberNameSetting,
+  getAutoCheckinSetting,
+  setAutoCheckinSetting 
+} from '@/lib/utils'
 
-// 저장된 이름 불러오기
+// 저장된 이름과 설정 불러오기
 const savedName = getSavedName()
 const rememberSetting = getRememberNameSetting()
+const autoCheckinSetting = getAutoCheckinSetting()
 
 // 이름 저장/삭제
 if (rememberName && name.trim()) {
@@ -222,6 +233,20 @@ if (rememberName && name.trim()) {
 } else {
   removeSavedName()
 }
+
+// 자동 체크인 설정 저장
+setAutoCheckinSetting(autoCheckinEnabled)
+
+// 자동 체크인 로직
+useEffect(() => {
+  if (mounted && autoCheckin && name.trim() && !isCheckingIn && !showSuccess) {
+    const timer = setTimeout(() => {
+      handleCheckIn()
+    }, 1000)
+    
+    return () => clearTimeout(timer)
+  }
+}, [mounted, autoCheckin, name, isCheckingIn, showSuccess])
 ```
 
 ### KST/UTC 시간 변환
@@ -287,6 +312,7 @@ const MODAL_VERSION = '2.0' // 버전을 변경하면 모든 사용자에게 다
 1. **체크인하기**:
    - 이름을 입력하고 체크인 버튼을 클릭
    - "이름 저장하기" 체크박스를 활성화하면 다음에 자동으로 이름이 입력됩니다
+   - "자동 체크인하기" 체크박스를 활성화하면 페이지 접근 시 저장된 이름으로 자동 체크인됩니다
    - 조식 시간(08:00-10:00) 외에도 체크인 가능 (경고 메시지 표시)
 
 2. **이용 현황 확인**:
