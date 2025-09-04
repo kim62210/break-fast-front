@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleSpreadSheetService } from "@/services/googleSheetsService";
-import { getKSTDate, formatKSTDate } from "@/lib/utils";
+import { getKSTDate, formatKSTDate, kstDateToUTCTimestamp } from "@/lib/utils";
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
         name,
         date: formatKSTDate(kstCheckInDate),
         time: kstCheckInDate.toLocaleTimeString("ko-KR"),
-        timestamp: kstCheckInDate.toISOString(),
+        timestamp: kstDateToUTCTimestamp(kstCheckInDate),
       };
 
       await googleSheetsService.addCheckIn(checkInData);

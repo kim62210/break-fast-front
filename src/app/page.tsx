@@ -9,14 +9,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/components/ui/use-toast'
 import Link from 'next/link'
 import WelcomeModal from '@/components/WelcomeModal'
 import { useWelcomeModal } from '@/hooks/useWelcomeModal'
-import { getKSTDate, getKSTDayFromDate } from '@/lib/utils'
+import { getKSTDate, getKSTDayFromDate, getSavedName, saveName, removeSavedName, getRememberNameSetting, setRememberNameSetting } from '@/lib/utils'
 
 export default function Home() {
   const [name, setName] = useState('')
+  const [rememberName, setRememberName] = useState(false)
   const [currentTime, setCurrentTime] = useState(getKSTDate())
   const [isCheckingIn, setIsCheckingIn] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
@@ -36,6 +38,15 @@ export default function Home() {
     const timer = setInterval(() => {
       setCurrentTime(getKSTDate())
     }, 1000)
+    
+    // 저장된 이름과 설정 불러오기
+    const savedName = getSavedName()
+    const rememberSetting = getRememberNameSetting()
+    
+    if (rememberSetting && savedName) {
+      setName(savedName)
+    }
+    setRememberName(rememberSetting)
     
     // 월별 전체 데이터 로드
     fetchMonthlyData()
@@ -74,19 +85,6 @@ export default function Home() {
       setIsLoadingStats(false) // 로딩 상태 해제
     }
   }, [monthlyData])
-
-  const fetchTodayCheckIns = async () => {
-    try {
-      const response = await fetch('/api/checkin')
-      const data = await response.json()
-      if (response.ok) {
-        setCheckedInCount(data.count)
-        setCheckedInUsers(data.checkIns || [])
-      }
-    } catch (error) {
-      console.error('체크인 현황 조회 실패:', error)
-    }
-  }
 
   const fetchMonthlyData = async () => {
     try {
@@ -252,6 +250,19 @@ export default function Home() {
     setSelectedDate(today)
   }
 
+  const handleRememberNameChange = (checked: boolean) => {
+    setRememberName(checked)
+    setRememberNameSetting(checked)
+    
+    if (checked && name.trim()) {
+      // 체크박스를 활성화하고 이름이 있으면 즉시 저장
+      saveName(name.trim())
+    } else if (!checked) {
+      // 체크박스를 비활성화하면 저장된 이름 삭제
+      removeSavedName()
+    }
+  }
+
   const isBreakfastTime = () => {
     const hours = currentTime.getHours()
     return hours >= 8 && hours < 10
@@ -291,6 +302,11 @@ export default function Home() {
 
       setShowSuccess(true)
       
+      // 이름 저장 기능이 활성화되어 있으면 이름 저장
+      if (rememberName && name.trim()) {
+        saveName(name.trim())
+      }
+      
       // 체크인 후 현황 업데이트 - 현재 선택된 날짜가 오늘인 경우에만
       const today = getKSTDate()
       if (selectedDate.toDateString() === today.toDateString()) {
@@ -312,7 +328,10 @@ export default function Home() {
 
       setTimeout(() => {
         setShowSuccess(false)
-        setName('')
+        // 이름 저장 기능이 비활성화되어 있을 때만 이름 클리어
+        if (!rememberName) {
+          setName('')
+        }
       }, 3000)
     } catch (error: any) {
       toast({
@@ -561,6 +580,21 @@ export default function Home() {
                     '체크인'
                   )}
                 </Button>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="remember-name"
+                  checked={rememberName}
+                  onCheckedChange={handleRememberNameChange}
+                  disabled={isCheckingIn || showSuccess}
+                />
+                <label 
+                  htmlFor="remember-name" 
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  이름 저장하기
+                </label>
               </div>
               
               {!isBreakfastTime() && (

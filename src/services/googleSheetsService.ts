@@ -1,5 +1,5 @@
-import { google, sheets_v4, drive_v3 } from "googleapis";
-import { getKSTDate, getKSTDayFromDate } from "@/lib/utils";
+import { google, sheets_v4 } from "googleapis";
+import { getKSTDate, utcTimestampToKSTDate } from "@/lib/utils";
 
 /** 구글 스프레드 서비스 상수 */
 const GOOGLE_SHEET_CONSTANT = {
@@ -150,9 +150,9 @@ export class GoogleSpreadSheetService {
   /**
    * 날짜에 해당하는 열 번호 계산 (F열=6부터 시작)
    */
-  private getColumnByDate(date: number): string {
+  private getColumnByDate(day: number): string {
     // F열이 1일, G열이 2일, ... AJ열이 31일
-    const columnIndex = 5 + date; // F열이 6번째 열(인덱스 5)
+    const columnIndex = 5 + day; // F열이 6번째 열(인덱스 5)
     return this.numberToColumnLetter(columnIndex);
   }
 
@@ -180,9 +180,9 @@ export class GoogleSpreadSheetService {
       }
 
       const trimmedName = checkInData.name.trim();
-      const checkInDate = new Date(checkInData.timestamp);
+      const checkInDate = utcTimestampToKSTDate(checkInData.timestamp); // UTC timestamp를 KST로 변환
       const sheetName = this.getSheetNameByDate(checkInDate);
-      const day = getKSTDayFromDate(checkInDate); // KST 기준 날짜
+      const day = checkInDate.getDate(); // 이미 KST로 변환된 날짜
 
       // 중복 체크
       const isDuplicate = await this.isDuplicateCheckIn(
@@ -379,7 +379,7 @@ export class GoogleSpreadSheetService {
   private async isDuplicateCheckIn(name: string, date: Date): Promise<boolean> {
     try {
       const sheetName = this.getSheetNameByDate(date);
-      const day = getKSTDayFromDate(date); // KST 기준 날짜
+      const day = date.getDate(); // 이미 KST로 변환된 날짜
 
       // 사용자 목록에서 해당 이름의 행 찾기
       const userList = await this.getUserList(sheetName);
