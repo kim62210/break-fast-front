@@ -15,6 +15,8 @@ import Link from 'next/link'
 import WelcomeModal from '@/components/WelcomeModal'
 import { useWelcomeModal } from '@/hooks/useWelcomeModal'
 import { getKSTDate, getKSTDayFromDate, getSavedName, saveName, removeSavedName, getRememberNameSetting, setRememberNameSetting, getAutoCheckinSetting, setAutoCheckinSetting } from '@/lib/utils'
+import { Room } from './Room'
+import { CollaborativeApp } from './CollaborativeApp'
 
 export default function Home() {
   const [name, setName] = useState('')
@@ -716,6 +718,25 @@ export default function Home() {
                 </div>
               </div>
             </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.6 }}
+        className="mt-8"
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle>실시간 댓글</CardTitle>
+            <CardDescription>조식에 대한 의견이나 소감을 공유해보세요</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Room>
+              <CollaborativeApp />
+            </Room>
           </CardContent>
         </Card>
       </motion.div>
