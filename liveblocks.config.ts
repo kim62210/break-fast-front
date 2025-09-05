@@ -10,8 +10,15 @@ declare global {
 
     // The Storage tree for the room, for useMutation, useStorage, etc.
     Storage: {
-      // Example, a conflict-free list
-      // animals: LiveList<string>;
+      // Whiteboard drawing paths for collaborative drawing
+      layers: LiveMap<
+        string,
+        LiveObject<{
+          id: string;
+          points: { x: number; y: number }[];
+          color: string;
+        }>
+      >;
     };
 
     // Custom user info set when authenticating with a secret key

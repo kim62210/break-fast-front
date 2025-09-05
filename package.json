@@ -27,6 +27,7 @@
     "framer-motion": "^11.0.24",
     "googleapis": "^158.0.0",
     "lucide-react": "^0.368.0",
+    "nanoid": "^5.1.5",
     "next": "14.2.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

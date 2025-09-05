@@ -393,12 +393,19 @@ export default function Home() {
             <Coffee className="w-6 h-6 sm:w-10 sm:h-10 text-primary" />
             <span className="text-center sm:text-left">조식 체크인 시스템</span>
           </h1>
-          <Link href="/statistics" className="mt-2 sm:mt-0">
-            <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-              <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-              통계 보기
-            </Button>
-          </Link>
+          <div className="flex gap-2 mt-2 sm:mt-0">
+            <Link href="/statistics">
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                통계 보기
+              </Button>
+            </Link>
+            <Link href="/whiteboard">
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                ✏️ 화이트보드
+              </Button>
+            </Link>
+          </div>
         </div>
         <p className="text-sm sm:text-base text-gray-600 px-4">QR 코드로 간편하게 조식을 체크인하세요</p>
       </motion.div>
