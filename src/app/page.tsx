@@ -28,7 +28,6 @@ export default function Home() {
   const autoCheckinAttempted = useRef(false)
   const [checkedInCount, setCheckedInCount] = useState(0)
   const [checkedInUsers, setCheckedInUsers] = useState<any[]>([])
-  const [showUserList, setShowUserList] = useState(false)
   const [selectedDate, setSelectedDate] = useState(getKSTDate())
   const [isLoadingStats, setIsLoadingStats] = useState(false)
   const [monthlyData, setMonthlyData] = useState<any>(null)
@@ -389,7 +388,7 @@ export default function Home() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 mb-4">
           <h1 className="text-2xl sm:text-4xl font-bold text-gray-800 flex items-center gap-2">
             <Coffee className="w-6 h-6 sm:w-10 sm:h-10 text-primary" />
-            <span className="text-center sm:text-left">조식 체크인 시스템</span>
+            <span className="text-center sm:text-left">쉽다 조식 체크인 시스템</span>
           </h1>
           <Link href="/statistics" className="mt-2 sm:mt-0">
             <Button variant="outline" size="sm" className="text-xs sm:text-sm">
