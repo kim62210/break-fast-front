@@ -44,7 +44,7 @@ export default function StatisticsPage() {
 
   useEffect(() => {
     fetchMonthlyFullData()
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchMonthlyFullData = async () => {
     setIsLoading(true)
@@ -157,6 +157,131 @@ export default function StatisticsPage() {
     }
     
     return users
+  }
+
+  // 요일 계산 함수
+  const getWeekday = (year: number, month: number, day: number) => {
+    const date = new Date(year, month - 1, day)
+    const weekdays = ['일', '월', '화', '수', '목', '금', '토']
+    return weekdays[date.getDay()]
+  }
+
+  // 주말 여부 확인 함수
+  const isWeekend = (year: number, month: number, day: number) => {
+    const date = new Date(year, month - 1, day)
+    return date.getDay() === 0 || date.getDay() === 6 // 일요일(0) 또는 토요일(6)
+  }
+
+  // 달력 형태의 일별 통계 컴포넌트
+  const CalendarView = () => {
+    if (!rawData || !processedStats) return null
+    
+    const totalUsers = rawData.userList.length
+    const days = Array.from({ length: rawData.daysInMonth }, (_, i) => i + 1)
+    
+    return (
+      <div className="grid grid-cols-7 gap-2 sm:gap-3">
+        {/* 요일 헤더 */}
+        {['일', '월', '화', '수', '목', '금', '토'].map((day, index) => (
+          <div 
+            key={day} 
+            className={`text-center text-xs sm:text-sm font-medium p-2 ${
+              index === 0 || index === 6 ? 'text-red-500' : 'text-gray-600'
+            }`}
+          >
+            {day}
+          </div>
+        ))}
+        
+        {/* 첫째 주 시작 전 빈 칸들 */}
+        {Array.from({ length: new Date(rawData.currentYear, rawData.currentMonth - 1, 1).getDay() }, (_, i) => (
+          <div key={`empty-${i}`} className="aspect-square" />
+        ))}
+        
+        {/* 달력 날짜들 */}
+        {days.map((day) => {
+          const dateKey = `${rawData.currentYear}-${rawData.currentMonth.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
+          const count = processedStats.dailyStats[dateKey] || 0
+          const percentage = totalUsers > 0 ? Math.round((count / totalUsers) * 100) : 0
+          const weekday = getWeekday(rawData.currentYear, rawData.currentMonth, day)
+          const weekend = isWeekend(rawData.currentYear, rawData.currentMonth, day)
+          const users = getUsersForDate(day)
+          
+          return (
+            <motion.div
+              key={day}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3, delay: day * 0.01 }}
+              className={`aspect-square border-2 rounded-lg p-1 sm:p-2 flex flex-col items-center justify-center relative group cursor-pointer transition-all hover:shadow-lg ${
+                weekend ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-white'
+              } ${count > 0 ? 'shadow-md' : ''}`}
+              title={users.length > 0 ? `${day}일 (${weekday})\n식수인원: ${count}명 (${percentage}%)\n이용자: ${users.join(', ')}` : `${day}일 (${weekday})\n식수인원: 0명`}
+            >
+              {/* 날짜 */}
+              <div className={`text-xs sm:text-sm font-bold mb-1 ${weekend ? 'text-red-600' : 'text-gray-800'}`}>
+                {day}
+              </div>
+              
+              {/* 요일 */}
+              <div className={`text-[10px] sm:text-xs ${weekend ? 'text-red-500' : 'text-gray-500'}`}>
+                {weekday}
+              </div>
+              
+              {/* 식수 인원 */}
+              {count > 0 && (
+                <div className="text-xs sm:text-sm font-semibold text-blue-600 mt-1">
+                  {count}명
+                </div>
+              )}
+              
+              {/* 퍼센티지 바 */}
+              {count > 0 && (
+                <div className="w-full bg-gray-200 rounded-full h-1 sm:h-1.5 mt-1">
+                  <motion.div
+                    className={`h-1 sm:h-1.5 rounded-full ${weekend ? 'bg-red-400' : 'bg-blue-400'}`}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${percentage}%` }}
+                    transition={{ duration: 0.8, delay: day * 0.02 }}
+                  />
+                </div>
+              )}
+              
+              {/* 퍼센티지 표시 */}
+              {count > 0 && (
+                <div className={`text-[10px] sm:text-xs font-medium mt-0.5 ${weekend ? 'text-red-600' : 'text-blue-600'}`}>
+                  {percentage}%
+                </div>
+              )}
+              
+              {/* 호버 시 상세 정보 */}
+              <div className="absolute inset-0 bg-black bg-opacity-75 text-white rounded-lg p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-center items-center text-xs z-10 pointer-events-none">
+                <div className="font-bold">{day}일 ({weekday})</div>
+                <div className="text-center mt-1">
+                  {count > 0 ? (
+                    <>
+                      <div>식수인원: {count}명 ({percentage}%)</div>
+                      {users.length > 0 && users.length <= 3 && (
+                        <div className="mt-1 text-[10px]">
+                          {users.join(', ')}
+                        </div>
+                      )}
+                      {users.length > 3 && (
+                        <div className="mt-1 text-[10px]">
+                          {users.slice(0, 2).join(', ')} 외 {users.length - 2}명
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div>식수인원: 0명</div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )
+        })}
+      </div>
+    )
   }
 
   return (
@@ -294,11 +419,11 @@ export default function StatisticsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
-                일별 이용 현황
+                <Calendar className="w-5 h-5" />
+                일별 이용 현황 (달력 뷰)
               </CardTitle>
               <CardDescription>
-                이번 달 일별 조식 이용자 수
+                이번 달 일별 조식 이용자 수 - 주말은 빨간색으로 표시됩니다
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -307,29 +432,7 @@ export default function StatisticsPage() {
                   <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
                 </div>
               ) : (
-                <div className="space-y-3 sm:space-y-4">
-                  {getDailyStatsArray().map(({ date, count, dayOfMonth }) => (
-                    <div key={date} className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 sm:gap-4 flex-1">
-                        <span className="w-8 sm:w-12 text-xs sm:text-sm font-medium">{dayOfMonth}일</span>
-                        <div className="flex-1 max-w-32 sm:max-w-64 bg-gray-200 rounded-full h-2 sm:h-3">
-                          <motion.div
-                            className="bg-primary h-2 sm:h-3 rounded-full"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${(count / getMaxCount()) * 100}%` }}
-                            transition={{ duration: 0.8, delay: dayOfMonth * 0.02 }}
-                          />
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-sm sm:text-lg font-bold">{count}명</span>
-                        <span className="text-xs sm:text-sm text-gray-600 ml-1 sm:ml-2 hidden sm:inline">
-                          ({Math.round((count / getMaxCount()) * 100)}%)
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <CalendarView />
               )}
             </CardContent>
           </Card>
