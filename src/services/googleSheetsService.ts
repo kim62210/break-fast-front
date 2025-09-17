@@ -695,6 +695,8 @@ export class GoogleSpreadSheetService {
       const response = await this.sheetClient.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: range,
+        valueRenderOption: "UNFORMATTED_VALUE",
+        dateTimeRenderOption: "FORMATTED_STRING",
       });
 
       const rawData: boolean[][] = [];
@@ -777,6 +779,7 @@ export class GoogleSpreadSheetService {
       const response = await this.sheetClient.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: range,
+        valueRenderOption: "UNFORMATTED_VALUE",
       });
 
       const rawData: boolean[][] = [];
